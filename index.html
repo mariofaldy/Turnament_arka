@@ -2473,6 +2473,7 @@ function loadFromLocalStorage(){
     return true;
   } catch(err){ console.error('Gagal memuat dari penyimpanan lokal:', err); return false; }
 }
+let fbWritePending = false; // true dari saat ada perubahan lokal sampai tulisannya benar-benar sampai ke server
 function scheduleSave(){
   // Selalu simpan ke localStorage browser ini, apa pun status Firebase-nya.
   saveToLocalStorage();
@@ -2480,6 +2481,7 @@ function scheduleSave(){
   // cuma baca (real-time listener), sesuai Firestore Rules di komentar atas.
   if (!FIREBASE_ENABLED || !fbReady || fbApplyingRemote || !fbUser) return;
   setFbStatus('saving');
+  fbWritePending = true; // sejak sekarang sampai tulisan ini sukses, abaikan snapshot masuk yang lebih lama
   clearTimeout(fbSaveTimer);
   fbSaveTimer = setTimeout(function(){
     const payload = fbSnapshotData();
@@ -2488,13 +2490,14 @@ function scheduleSave(){
     const approxBytes = new Blob([JSON.stringify(payload)]).size;
     if (approxBytes > 900000){
       setFbStatus('error');
+      fbWritePending = false;
       console.error('Data terlalu besar untuk Firestore:', approxBytes, 'byte (batas 1 MB).');
       alert('Data turnamen sudah terlalu besar (' + Math.round(approxBytes/1024) + ' KB, batas 1 MB) sehingga gagal disimpan ke cloud.\n\nBiasanya ini karena terlalu banyak logo tim. Coba hapus beberapa logo yang tidak terpakai. Data tetap tersimpan di browser ini.');
       return;
     }
     fbDb.collection(FB_COLLECTION).doc(FB_DOC).set(payload)
-      .then(function(){ setFbStatus('synced'); })
-      .catch(function(err){ console.error('Gagal menyimpan ke Firebase:', err); setFbStatus('error'); });
+      .then(function(){ setFbStatus('synced'); fbWritePending = false; })
+      .catch(function(err){ console.error('Gagal menyimpan ke Firebase:', err); setFbStatus('error'); fbWritePending = false; });
   }, 700);
 }
 function initFirebase(){
@@ -2523,6 +2526,11 @@ function initFirebase(){
     safeRender(); ensureLiveTimer();
     docRef.onSnapshot(function(snap){
       if (!snap.exists) return;
+      // Kalau ada perubahan lokal yang belum selesai terkirim ke server (mis. baru
+      // saja klik "Simpan Gol"/"Simpan Kartu"), JANGAN timpa dulu dengan data lama
+      // dari snapshot ini — nanti begitu tulisan lokal kelar, snapshot barunya yang
+      // sudah termasuk perubahan itu akan datang dan diterapkan seperti biasa.
+      if (fbWritePending) return;
       fbApplyingRemote = true; fbApplySnapshot(snap.data()); fbApplyingRemote = false;
       safeRender();
     }, function(err){
