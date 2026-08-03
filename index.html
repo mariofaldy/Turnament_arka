@@ -1149,6 +1149,10 @@ function buildAddEventModal(t){
   const teamLive = t.liveMatch[side];
   const teamFull = t.teams.find(function(tm){ return tm.id === teamLive.id; }) || t.teams.find(function(tm){ return tm.name === teamLive.name; });
   const players = teamFull ? teamFull.players : [];
+  // Data lama (sebelum fitur ini ada) mungkin belum punya array scorers/cards —
+  // pastikan ada dulu supaya .push() di bawah tidak diam-diam gagal.
+  if (!teamLive.scorers) teamLive.scorers = [];
+  if (!teamLive.cards) teamLive.cards = [];
 
   const form = { name:'', cardType:'yellow', minute: t.liveMatch.minute, isPenalty:false };
 
@@ -1216,21 +1220,27 @@ function buildAddEventModal(t){
     const name = (form.name||'').trim();
     if (!name){ statusMsg.textContent = 'Nama pemain wajib diisi.'; return; }
     const minute = isNaN(form.minute) ? t.liveMatch.minute : Math.max(0, Math.min(120, form.minute));
-
-    if (cfg.type === 'goal'){
-      teamLive.scorers.push({name:name, minute:minute, penalty: !!form.isPenalty});
-      teamLive.score = (teamLive.score||0) + 1;
-      const existing = t.topScorers.find(function(p){ return p.name.toLowerCase()===name.toLowerCase() && p.team===teamLive.name; });
-      if (existing) existing.goals = (existing.goals||0) + 1;
-      else t.topScorers.push({id:nextId(), name:name, team:teamLive.name, goals:1});
-    } else {
-      if (!teamLive.cards) teamLive.cards = [];
-      teamLive.cards.push({name:name, type:form.cardType, minute:minute});
-      if (form.cardType==='red') teamLive.red = (teamLive.red||0)+1; else teamLive.yellow = (teamLive.yellow||0)+1;
-      if (teamFull){
-        if (form.cardType==='red') teamFull.fairplay.red = (teamFull.fairplay.red||0)+1;
-        else teamFull.fairplay.yellow = (teamFull.fairplay.yellow||0)+1;
+    try{
+      if (cfg.type === 'goal'){
+        teamLive.scorers.push({name:name, minute:minute, penalty: !!form.isPenalty});
+        teamLive.score = (teamLive.score||0) + 1;
+        if (!t.topScorers) t.topScorers = [];
+        const existing = t.topScorers.find(function(p){ return p.name.toLowerCase()===name.toLowerCase() && p.team===teamLive.name; });
+        if (existing) existing.goals = (existing.goals||0) + 1;
+        else t.topScorers.push({id:nextId(), name:name, team:teamLive.name, goals:1});
+      } else {
+        teamLive.cards.push({name:name, type:form.cardType, minute:minute});
+        if (form.cardType==='red') teamLive.red = (teamLive.red||0)+1; else teamLive.yellow = (teamLive.yellow||0)+1;
+        if (teamFull){
+          if (!teamFull.fairplay) teamFull.fairplay = {yellow:0, red:0};
+          if (form.cardType==='red') teamFull.fairplay.red = (teamFull.fairplay.red||0)+1;
+          else teamFull.fairplay.yellow = (teamFull.fairplay.yellow||0)+1;
+        }
       }
+    } catch(err){
+      console.error('Gagal menyimpan gol/kartu:', err);
+      statusMsg.textContent = 'Gagal menyimpan: ' + err.message;
+      return;
     }
     state.showAddEvent = null;
     render();
