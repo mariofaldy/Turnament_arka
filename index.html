@@ -1049,13 +1049,37 @@ function ensureLiveTimer(){
     const totalMin = mc.halfMinutes * mc.halves;
     if (m>=totalMin) return;
     t.liveMatch.minute = m; t.liveMatch.second = s;
-    // jangan render ulang (yang akan menghapus DOM) saat ada modal terbuka atau user sedang mengetik,
-    // supaya form/isian yang sedang diisi tidak hilang tiba-tiba. Data waktu tetap jalan di belakang layar.
-    if (state.showAddTournament || state.showImportTeams || state.showAddEvent) return;
-    if (document.activeElement && (document.activeElement.tagName==='INPUT' || document.activeElement.tagName==='SELECT')) return;
+    if (shouldSkipAutoRender()) return;
     render();
   }, 1000);
 }
+
+/* ---------- GUARD: cegah render otomatis (dari background/Firebase) menutup paksa
+   kalender/jam yang lagi kebuka, dropdown, atau input yang lagi diketik ---------- */
+let pendingBackgroundRender = false;
+function shouldSkipAutoRender(){
+  // Modal terbuka -> jangan render ulang di belakang layar (biar isian di form tidak hilang).
+  if (state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showBracketWinner || state.showAdminLogin) return true;
+  // Ada input/select/textarea yang sedang fokus (termasuk saat kalender/jam native browser lagi kebuka)
+  // -> jangan render ulang, supaya popup-nya tidak ketutup paksa.
+  const ae = document.activeElement;
+  if (ae && (ae.tagName==='INPUT' || ae.tagName==='SELECT' || ae.tagName==='TEXTAREA')) return true;
+  return false;
+}
+// Dipakai oleh event Firebase (auth state change, snapshot realtime) yang bisa muncul
+// kapan saja di belakang layar. Kalau lagi tidak aman untuk render ulang, tunda dulu
+// dan biarkan interval flush di bawah yang menyelesaikannya begitu user selesai berinteraksi.
+function safeRender(){
+  if (shouldSkipAutoRender()){ pendingBackgroundRender = true; return; }
+  pendingBackgroundRender = false;
+  render();
+}
+setInterval(function(){
+  if (pendingBackgroundRender && !shouldSkipAutoRender()){
+    pendingBackgroundRender = false;
+    render();
+  }
+}, 400);
 
 /* ---------- ADD LIVE MATCH EVENT MODAL (goal / card) ---------- */
 function buildAddEventModal(t){
@@ -2403,7 +2427,7 @@ function initFirebase(){
   firebase.auth().onAuthStateChanged(function(user){
     fbUser = user;
     if (!user) state.adminMode = false;
-    render();
+    safeRender();
   });
   const docRef = fbDb.collection(FB_COLLECTION).doc(FB_DOC);
   docRef.get().then(function(snap){
@@ -2414,11 +2438,11 @@ function initFirebase(){
       docRef.set(fbSnapshotData()).catch(function(err){ console.error('Gagal membuat data awal di Firebase:', err); });
     }
     fbReady = true; setFbStatus('synced');
-    render(); ensureLiveTimer();
+    safeRender(); ensureLiveTimer();
     docRef.onSnapshot(function(snap){
       if (!snap.exists) return;
       fbApplyingRemote = true; fbApplySnapshot(snap.data()); fbApplyingRemote = false;
-      render();
+      safeRender();
     }, function(err){
       console.error('Firebase realtime sync error:', err);
       setFbStatus('error');
@@ -2434,6 +2458,8 @@ function initFirebase(){
    ========================================================================= */
 loadFromLocalStorage();
 loadThemeFromLocalStorage();
+render(); // tampilkan data lokal dulu biar halaman tidak blank sambil menunggu Firebase
+ensureLiveTimer();
 initFirebase();
 </script>
 </body>
