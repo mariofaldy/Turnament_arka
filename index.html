@@ -903,6 +903,67 @@ function editableNumber(getVal, setVal, className, opts){
   input.addEventListener('click', function(e){ e.stopPropagation(); });
   return input;
 }
+/* ---------- LOGO / GAMBAR: kompres dulu sebelum disimpan ----------
+   Foto dari HP bisa 2-5 MB. Kalau disimpan mentah sebagai base64, ukurannya
+   membengkak ~33% dan langsung menembus batas Firestore (1 MB per dokumen)
+   maupun kuota localStorage — akibatnya penyimpanan gagal diam-diam dan logo
+   "hilang" lagi. Jadi setiap gambar di-resize ke kotak kecil dan dikompres
+   ke JPEG dulu, hasilnya cuma belasan KB per logo. */
+const LOGO_MAX_PX = 256;      // sisi terpanjang logo setelah di-resize
+const LOGO_QUALITY = 0.82;    // kualitas JPEG (0-1)
+
+function compressImageFile(file, cb){
+  if (!file || !/^image\//.test(file.type)){ cb(null, 'File yang dipilih bukan gambar.'); return; }
+  const reader = new FileReader();
+  reader.onerror = function(){ cb(null, 'Gagal membaca file gambar.'); };
+  reader.onload = function(ev){
+    const img = new Image();
+    img.onerror = function(){ cb(null, 'Format gambar tidak didukung browser.'); };
+    img.onload = function(){
+      let w = img.naturalWidth || img.width;
+      let h = img.naturalHeight || img.height;
+      if (!w || !h){ cb(null, 'Ukuran gambar tidak terbaca.'); return; }
+      const scale = Math.min(1, LOGO_MAX_PX / Math.max(w, h));
+      w = Math.max(1, Math.round(w * scale));
+      h = Math.max(1, Math.round(h * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      // latar putih supaya PNG transparan tidak jadi hitam saat diubah ke JPEG
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      try{
+        cb(canvas.toDataURL('image/jpeg', LOGO_QUALITY), null);
+      } catch(err){
+        console.error('Gagal mengompres gambar:', err);
+        cb(null, 'Gagal memproses gambar.');
+      }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* Satu input file yang dipakai ulang, supaya tidak menumpuk elemen tersembunyi
+   di <body> setiap kali halaman di-render ulang. */
+let sharedFileInput = null;
+function pickImageFile(onPicked){
+  if (!sharedFileInput){
+    sharedFileInput = document.createElement('input');
+    sharedFileInput.type = 'file';
+    sharedFileInput.accept = 'image/*';
+    sharedFileInput.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0;';
+    document.body.appendChild(sharedFileInput);
+  }
+  sharedFileInput.onchange = function(e){
+    const file = e.target.files && e.target.files[0];
+    sharedFileInput.value = ''; // reset supaya file yang sama bisa dipilih lagi
+    if (file) onPicked(file);
+  };
+  sharedFileInput.click();
+}
+
 function teamLogoEl(team, size){
   size = size||44;
   if (team && team.logoUrl){
@@ -1713,14 +1774,16 @@ function buildTeamsPage(t){
     const crestWrap = h('div', {style:{position:'relative'}});
     crestWrap.appendChild(team.logoUrl ? h('img',{src:team.logoUrl, class:'team-crest-lg', style:{objectFit:'cover'}}) : h('div', {class:'team-crest-lg', style:{background:GRAD_CSS[team.color]||GRAD_CSS['grad-blue']}}, team.emoji||'⚽'));
     if (state.adminMode){
-      const fileInput = h('input', {type:'file', accept:'image/*', style:{position:'absolute', width:'0', height:'0', opacity:'0', pointerEvents:'none', overflow:'hidden'}, onchange:function(e){
-        const file = e.target.files[0]; if(!file) return;
-        const reader = new FileReader();
-        reader.onload = function(ev){ team.logoUrl = ev.target.result; render(); };
-        reader.readAsDataURL(file);
-      }});
-      document.body.appendChild(fileInput);
-      const uploadBtn = h('button', {class:'logo-upload-btn', type:'button', onclick:function(e){ e.stopPropagation(); e.preventDefault(); fileInput.click(); }}, [icon('camera',11)]);
+      const uploadBtn = h('button', {class:'logo-upload-btn', type:'button', title:'Ganti logo tim', onclick:function(e){
+        e.stopPropagation(); e.preventDefault();
+        pickImageFile(function(file){
+          compressImageFile(file, function(dataUrl, errMsg){
+            if (!dataUrl){ alert(errMsg || 'Gagal memuat logo.'); return; }
+            team.logoUrl = dataUrl;
+            render();
+          });
+        });
+      }}, [icon('camera',11)]);
       crestWrap.appendChild(uploadBtn);
     }
     card.appendChild(crestWrap);
@@ -2142,14 +2205,13 @@ function buildImportTeamsModal(t){
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
     let remaining = files.length;
+    statusMsg.textContent = 'Memproses ' + files.length + ' logo…';
     files.forEach(function(file){
-      const reader = new FileReader();
-      reader.onload = function(ev){
-        imp.logoMap[normKey(file.name)] = ev.target.result;
+      compressImageFile(file, function(dataUrl){
+        if (dataUrl) imp.logoMap[normKey(file.name)] = dataUrl;
         remaining--;
         if (remaining === 0){ applyLogoMatches(); renderPreview(); }
-      };
-      reader.readAsDataURL(file);
+      });
     });
   });
 
@@ -2410,7 +2472,17 @@ function scheduleSave(){
   setFbStatus('saving');
   clearTimeout(fbSaveTimer);
   fbSaveTimer = setTimeout(function(){
-    fbDb.collection(FB_COLLECTION).doc(FB_DOC).set(fbSnapshotData())
+    const payload = fbSnapshotData();
+    // Firestore membatasi 1 MB per dokumen. Kalau kelewat (biasanya karena logo
+    // terlalu besar), tulisannya akan ditolak — beri tahu, jangan gagal diam-diam.
+    const approxBytes = new Blob([JSON.stringify(payload)]).size;
+    if (approxBytes > 900000){
+      setFbStatus('error');
+      console.error('Data terlalu besar untuk Firestore:', approxBytes, 'byte (batas 1 MB).');
+      alert('Data turnamen sudah terlalu besar (' + Math.round(approxBytes/1024) + ' KB, batas 1 MB) sehingga gagal disimpan ke cloud.\n\nBiasanya ini karena terlalu banyak logo tim. Coba hapus beberapa logo yang tidak terpakai. Data tetap tersimpan di browser ini.');
+      return;
+    }
+    fbDb.collection(FB_COLLECTION).doc(FB_DOC).set(payload)
       .then(function(){ setFbStatus('synced'); })
       .catch(function(err){ console.error('Gagal menyimpan ke Firebase:', err); setFbStatus('error'); });
   }, 700);
