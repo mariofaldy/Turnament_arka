@@ -275,7 +275,8 @@
   .team-card.selected{border-color:rgba(34,197,94,.5); background:rgba(34,197,94,.1);}
   .team-crest-lg{height:56px; width:56px; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:24px; color:#fff; position:relative;}
   .team-crest-lg img{height:56px; width:56px; border-radius:16px; object-fit:cover;}
-  .logo-upload-btn{position:absolute; bottom:-4px; right:-4px; height:24px; width:24px; border-radius:50%; background:var(--logo-upload-bg); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; color:var(--text-2);}
+  .logo-upload-btn{position:absolute; bottom:-4px; right:-4px; height:24px; width:24px; border-radius:50%; background:var(--logo-upload-bg); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; color:var(--text-2); cursor:pointer; padding:0; transition:background .15s ease, transform .15s ease;}
+  .logo-upload-btn:hover{background:var(--surface-strong); transform:scale(1.12);}
   .team-card-remove{position:absolute; top:6px; right:6px; color:var(--text-4); background:none; border:none;}
   .team-card-remove:hover{color:var(--red);}
 
@@ -293,6 +294,12 @@
   .icon-btn:hover{color:var(--red);}
   .form-input, select.form-input{width:100%; background:var(--surface-3); border:1px solid var(--border); border-radius:10px; padding:9px 12px; color:var(--text); font-size:13px; outline:none;}
   .form-input:focus{border-color:var(--blue);}
+  input[type="date"].form-input, input[type="time"].form-input{color-scheme:dark; cursor:pointer;}
+  input[type="date"].form-input::-webkit-calendar-picker-indicator,
+  input[type="time"].form-input::-webkit-calendar-picker-indicator{filter:invert(.7); cursor:pointer;}
+  body.theme-light input[type="date"].form-input, body.theme-light input[type="time"].form-input{color-scheme:light;}
+  body.theme-light input[type="date"].form-input::-webkit-calendar-picker-indicator,
+  body.theme-light input[type="time"].form-input::-webkit-calendar-picker-indicator{filter:none;}
   select.form-input option{background:var(--select-bg); color:var(--text);}
   .form-label{display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-3); margin-bottom:6px;}
   .form-row{display:grid; grid-template-columns:1fr; gap:12px;}
@@ -1682,13 +1689,14 @@ function buildTeamsPage(t){
     const crestWrap = h('div', {style:{position:'relative'}});
     crestWrap.appendChild(team.logoUrl ? h('img',{src:team.logoUrl, class:'team-crest-lg', style:{objectFit:'cover'}}) : h('div', {class:'team-crest-lg', style:{background:GRAD_CSS[team.color]||GRAD_CSS['grad-blue']}}, team.emoji||'⚽'));
     if (state.adminMode){
-      const fileInput = h('input', {type:'file', accept:'image/*', style:{display:'none'}, onchange:function(e){
+      const fileInput = h('input', {type:'file', accept:'image/*', style:{position:'absolute', width:'0', height:'0', opacity:'0', pointerEvents:'none', overflow:'hidden'}, onchange:function(e){
         const file = e.target.files[0]; if(!file) return;
         const reader = new FileReader();
         reader.onload = function(ev){ team.logoUrl = ev.target.result; render(); };
         reader.readAsDataURL(file);
       }});
-      const uploadBtn = h('label', {class:'logo-upload-btn', onclick:function(e){ e.stopPropagation(); }}, [icon('camera',11), fileInput]);
+      document.body.appendChild(fileInput);
+      const uploadBtn = h('button', {class:'logo-upload-btn', type:'button', onclick:function(e){ e.stopPropagation(); e.preventDefault(); fileInput.click(); }}, [icon('camera',11)]);
       crestWrap.appendChild(uploadBtn);
     }
     card.appendChild(crestWrap);
@@ -1764,10 +1772,25 @@ function buildFixturesPage(t){
     selA.value = fixtureForm.teamAId; selA.addEventListener('change', function(e){ fixtureForm.teamAId=e.target.value; });
     const selB = h('select', {class:'form-input'}, t.teams.map(function(tm){ return h('option',{value:tm.id}, tm.name); }));
     selB.value = fixtureForm.teamBId; selB.addEventListener('change', function(e){ fixtureForm.teamBId=e.target.value; });
-    const dateInp = h('input', {class:'form-input', placeholder:'Tanggal (18 Jul 2026)', value:fixtureForm.date});
-    dateInp.addEventListener('input', function(e){ fixtureForm.date=e.target.value; });
-    const timeInp = h('input', {class:'form-input', placeholder:'Jam (15:30)', value:fixtureForm.time});
-    timeInp.addEventListener('input', function(e){ fixtureForm.time=e.target.value; });
+    var dateMonths = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+    function dateToDisplay(isoStr){
+      if (!isoStr) return '';
+      var p = isoStr.split('-'); if(p.length!==3) return isoStr;
+      var d = parseInt(p[2],10), m = parseInt(p[1],10)-1, y = p[0];
+      return d + ' ' + (dateMonths[m]||'') + ' ' + y;
+    }
+    function displayToIso(displayStr){
+      if (!displayStr) return '';
+      var p = displayStr.split(' '); if(p.length!==3) return '';
+      var d = parseInt(p[0],10), mIdx = dateMonths.indexOf(p[1]), y = p[2];
+      if (mIdx===-1 || isNaN(d)) return '';
+      return y + '-' + String(mIdx+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    }
+    var dateIsoVal = displayToIso(fixtureForm.date);
+    const dateInp = h('input', {type:'date', class:'form-input', value:dateIsoVal});
+    dateInp.addEventListener('change', function(e){ fixtureForm.date = dateToDisplay(e.target.value); });
+    const timeInp = h('input', {type:'time', class:'form-input', value:fixtureForm.time});
+    timeInp.addEventListener('change', function(e){ fixtureForm.time = e.target.value; });
     const addBtn = h('button', {class:'btn btn-primary', onclick:function(){
       if (!fixtureForm.teamAId || !fixtureForm.teamBId || fixtureForm.teamAId===fixtureForm.teamBId || !fixtureForm.date || !fixtureForm.time) return;
       t.schedule.push({id:nextId(), teamAId:fixtureForm.teamAId, teamBId:fixtureForm.teamBId, date:fixtureForm.date, time:fixtureForm.time, status:'upcoming', scoreA:0, scoreB:0, statsApplied:false});
