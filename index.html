@@ -820,6 +820,7 @@ function buildSidebar(t){
   const themeToggle = h('button', {class:'theme-toggle', onclick:function(){
     state.theme = state.theme==='light' ? 'dark' : 'light';
     document.body.classList.toggle('theme-light', state.theme==='light');
+    saveThemeToLocalStorage();
     render();
   }}, [
     h('span', {class:'flex items-center gap-2'}, [icon(state.theme==='light' ? 'sun' : 'moon', 16), state.theme==='light' ? 'Tema Terang' : 'Tema Gelap']),
@@ -2317,6 +2318,20 @@ function fbLogout(){
 }
 /* ---------- Local storage (biar data tetap ada walau di-refresh, tanpa perlu Firebase) ---------- */
 const LOCAL_STORAGE_KEY = 'miniSoccerTournamentState_v1';
+const THEME_STORAGE_KEY = 'miniSoccerTournamentTheme_v1';
+function saveThemeToLocalStorage(){
+  try{ localStorage.setItem(THEME_STORAGE_KEY, state.theme); }
+  catch(err){ console.error('Gagal menyimpan tema ke penyimpanan lokal:', err); }
+}
+function loadThemeFromLocalStorage(){
+  try{
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === 'light' || saved === 'dark'){
+      state.theme = saved;
+      document.body.classList.toggle('theme-light', state.theme === 'light');
+    }
+  } catch(err){ console.error('Gagal memuat tema dari penyimpanan lokal:', err); }
+}
 function saveToLocalStorage(){
   try{
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
@@ -2395,6 +2410,7 @@ function initFirebase(){
    INIT
    ========================================================================= */
 loadFromLocalStorage();
+loadThemeFromLocalStorage();
 initFirebase();
 </script>
 </body>
