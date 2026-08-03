@@ -467,6 +467,24 @@ function frag(children){ const f=document.createDocumentFragment(); (children||[
    ========================================================================= */
 let uidCounter = 1000;
 function nextId(){ return String(uidCounter++); }
+// Mengubah nilai <input type="date"> (YYYY-MM-DD) menjadi format tampilan "18 Jul 2026".
+// Jika string tidak sesuai format tanggal (mis. data lama berupa teks bebas), tampilkan apa adanya.
+const BULAN_ID = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+function formatTanggalTampil(dateStr){
+  if (!dateStr) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!m) return dateStr;
+  const y = m[1], mo = parseInt(m[2],10)-1, d = parseInt(m[3],10);
+  if (mo<0||mo>11) return dateStr;
+  return d + ' ' + BULAN_ID[mo] + ' ' + y;
+}
+// Mengubah nilai <input type="time"> (HH:MM) menjadi format tampilan "15.30".
+function formatJamTampil(timeStr){
+  if (!timeStr) return '';
+  const m = /^(\d{2}):(\d{2})$/.exec(timeStr);
+  if (!m) return timeStr;
+  return m[1] + '.' + m[2];
+}
 
 const TEAM_EMOJIS = ["⚽","🦁","🐉","🦅","🐺","🔥","🛡️","👑","🌟","🦂","🐯","🦈","🐗","🦇","🐅","🦍"];
 const TEAM_COLORS = ["grad-blue","grad-purple","grad-emerald","grad-orange","grad-pink","grad-cyan","grad-red","grad-yellow","grad-indigo","grad-teal"];
@@ -1250,6 +1268,36 @@ function finalizeLiveMatch(t){
   finalizeFixture(t, s);
 }
 
+// Menghitung "poin disiplin" tim (Kuning x1 + Merah x3). Semakin kecil semakin baik (fair play).
+function cardPoints(tm){ return (tm.fairplay && tm.fairplay.yellow||0)*1 + (tm.fairplay && tm.fairplay.red||0)*3; }
+// Head-to-head: membandingkan hasil pertandingan langsung antara dua tim (yang sudah selesai).
+// Mengembalikan >0 jika teamA lebih unggul, <0 jika teamB lebih unggul, 0 jika belum pernah bertemu / masih imbang.
+function headToHeadCompare(t, teamA, teamB){
+  let ptsA=0, ptsB=0, gdA=0, gdB=0;
+  (t.schedule||[]).forEach(function(s){
+    if (s.status!=='finished') return;
+    const sa = Number(s.scoreA)||0, sb = Number(s.scoreB)||0;
+    if (s.teamAId===teamA.id && s.teamBId===teamB.id){
+      gdA += sa-sb; gdB += sb-sa;
+      if (sa>sb) ptsA+=3; else if (sb>sa) ptsB+=3; else { ptsA+=1; ptsB+=1; }
+    } else if (s.teamAId===teamB.id && s.teamBId===teamA.id){
+      gdA += sb-sa; gdB += sa-sb;
+      if (sb>sa) ptsA+=3; else if (sa>sb) ptsB+=3; else { ptsA+=1; ptsB+=1; }
+    }
+  });
+  if (ptsA!==ptsB) return ptsA-ptsB;
+  return gdA-gdB;
+}
+// Urutan tie-break klasemen grup (mengikuti kaidah umum sepakbola):
+// 1) Poin  2) Selisih Gol  3) Gol Memasukkan  4) Poin Disiplin/Kartu (lebih sedikit lebih baik)  5) Head-to-Head.
+function compareStandings(t, a, b){
+  return (b.stats.pts-a.stats.pts)
+    || (b.stats.gd-a.stats.gd)
+    || ((b.stats.gf||0)-(a.stats.gf||0))
+    || (cardPoints(a)-cardPoints(b))
+    || headToHeadCompare(t, b, a);
+}
+
 let standingsActiveGroup = null;
 function buildGroupStandings(t){
   const panel = h('div', {class:'panel'});
@@ -1626,14 +1674,17 @@ function buildFairPlayPanel(t){
 function buildScheduleNewsPanel(t){
   const panel = h('div', {class:'panel'});
   const teamName = function(id){ const f=t.teams.find(function(x){return x.id===id;}); return f?f.name:'Tim Dihapus'; };
-  const upcoming = t.schedule.filter(function(s){return s.status!=='finished';}).slice(0,4);
+  const upcoming = t.schedule.filter(function(s){return s.status!=='finished';})
+    .slice()
+    .sort(function(a,b){ return (a.date+' '+a.time).localeCompare(b.date+' '+b.time); })
+    .slice(0,4);
 
   panel.appendChild(sectionTitle('calendar', 'Jadwal Mendatang'));
   upcoming.forEach(function(s){
     panel.appendChild(h('div', {class:'sched-item'}, [
       h('div', {style:{flex:1, minWidth:0}}, [
         h('div', {class:'flex items-center gap-1 text-xs'}, [h('span',{class:'font-medium truncate'},teamName(s.teamAId)), h('span',{class:'muted'},'vs'), h('span',{class:'font-medium truncate'},teamName(s.teamBId))]),
-        h('div', {class:'flex items-center gap-1 text-xs muted', style:{marginTop:'3px'}}, [s.date, '•', s.time])
+        h('div', {class:'flex items-center gap-1 text-xs muted', style:{marginTop:'3px'}}, [formatTanggalTampil(s.date), '•', formatJamTampil(s.time)])
       ]),
       h('span', {class:'status-pill ' + (s.status==='live'?'status-live':'status-upcoming')}, s.status==='live'?'LIVE':'Mendatang')
     ]));
@@ -1763,10 +1814,12 @@ function buildFixturesPage(t){
     selA.value = fixtureForm.teamAId; selA.addEventListener('change', function(e){ fixtureForm.teamAId=e.target.value; });
     const selB = h('select', {class:'form-input'}, t.teams.map(function(tm){ return h('option',{value:tm.id}, tm.name); }));
     selB.value = fixtureForm.teamBId; selB.addEventListener('change', function(e){ fixtureForm.teamBId=e.target.value; });
-    const dateInp = h('input', {class:'form-input', placeholder:'Tanggal (18 Jul 2026)', value:fixtureForm.date});
+    const dateInp = h('input', {type:'date', class:'form-input', value:fixtureForm.date});
     dateInp.addEventListener('input', function(e){ fixtureForm.date=e.target.value; });
-    const timeInp = h('input', {class:'form-input', placeholder:'Jam (15:30)', value:fixtureForm.time});
+    dateInp.addEventListener('change', function(e){ fixtureForm.date=e.target.value; });
+    const timeInp = h('input', {type:'time', class:'form-input', value:fixtureForm.time});
     timeInp.addEventListener('input', function(e){ fixtureForm.time=e.target.value; });
+    timeInp.addEventListener('change', function(e){ fixtureForm.time=e.target.value; });
     const addBtn = h('button', {class:'btn btn-primary', onclick:function(){
       if (!fixtureForm.teamAId || !fixtureForm.teamBId || fixtureForm.teamAId===fixtureForm.teamBId || !fixtureForm.date || !fixtureForm.time) return;
       t.schedule.push({id:nextId(), teamAId:fixtureForm.teamAId, teamBId:fixtureForm.teamBId, date:fixtureForm.date, time:fixtureForm.time, status:'upcoming', scoreA:0, scoreB:0, statsApplied:false});
@@ -1782,7 +1835,7 @@ function buildFixturesPage(t){
   panel2.appendChild(sectionTitle('calendar', 'Semua Jadwal Pertandingan'));
   const teamName = function(id){ const f=t.teams.find(function(x){return x.id===id;}); return f?f.name:'Tim Dihapus'; };
 
-  t.schedule.forEach(function(s){
+  t.schedule.slice().sort(function(a,b){ return (a.date+' '+a.time).localeCompare(b.date+' '+b.time); }).forEach(function(s){
     const infoBlock = h('div', {style:{flex:1, minWidth:0}});
     const nameRow = h('div', {class:'flex items-center gap-2 text-sm'});
     nameRow.appendChild(h('span', {class:'font-semibold truncate'}, teamName(s.teamAId)));
@@ -1793,7 +1846,7 @@ function buildFixturesPage(t){
     }
     nameRow.appendChild(h('span', {class:'font-semibold truncate'}, teamName(s.teamBId)));
     infoBlock.appendChild(nameRow);
-    infoBlock.appendChild(h('div', {class:'text-xs muted', style:{marginTop:'4px'}}, s.date+' • '+s.time));
+    infoBlock.appendChild(h('div', {class:'text-xs muted', style:{marginTop:'4px'}}, formatTanggalTampil(s.date)+' • '+formatJamTampil(s.time)));
 
     const badge = h('span', {class:'status-pill ' + (s.status==='live'?'status-live':(s.status==='finished'?'status-finished':'status-upcoming'))}, s.status==='live'?'LIVE':(s.status==='finished'?'Selesai':'Mendatang'));
 
