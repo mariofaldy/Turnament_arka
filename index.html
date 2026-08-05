@@ -154,39 +154,32 @@
   .live-label{color:var(--red); font-weight:700; font-size:13px; letter-spacing:.15em;}
   .pause-btn{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-2); border:1px solid var(--border); border-radius:999px; padding:5px 12px; background:none;}
   .score-row-wrap{position:relative;}
-  .score-row{display:flex; align-items:center; gap:6px; min-width:0;}
-  .team-block{display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 0; overflow:hidden;}
+  /* Tim A / Skor / Tim B selalu ditumpuk vertikal (bukan sejajar horizontal) — pada layar
+     lebar pun panel Live Score ini bisa jadi sempit karena berbagi tempat dengan panel lain
+     (mis. Bagan Turnamen) di layout dua kolom, jadi jangan andalkan lebar viewport saja. */
+  .score-row{display:flex; flex-direction:column; align-items:stretch; gap:14px; min-width:0;}
+  .team-block{display:flex; align-items:center; gap:8px; min-width:0; width:100%; overflow:visible;}
   .team-crest{height:40px; width:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#fff; flex-shrink:0;}
   .team-crest.a{background:linear-gradient(135deg,var(--blue),#15803d); box-shadow:0 10px 25px -8px rgba(34,197,94,.4);}
   .team-crest.b{background:linear-gradient(135deg,var(--purple),#b45309); box-shadow:0 10px 25px -8px rgba(245,158,11,.4);}
   .team-info-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:14px; color:var(--text-heading); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; display:block;}
-  .card-row{display:flex; align-items:center; gap:6px; font-size:10px; color:var(--text-3); margin-top:4px;}
+  .card-row{display:flex; align-items:center; gap:6px; font-size:10px; color:var(--text-3); margin-top:4px; flex-wrap:wrap;}
   .card-chip{display:flex; align-items:center; gap:4px;}
   .card-y{height:13px; width:9px; border-radius:2px; background:var(--yellow); display:inline-block;}
   .card-r{height:13px; width:9px; border-radius:2px; background:var(--red); display:inline-block;}
   .scorer-list{font-size:9.5px; color:var(--text-4); margin-top:4px; max-width:100%; overflow:hidden;}
   .scorer-list p{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .live-event-btns{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;}
-  .score-center{display:flex; flex-direction:column; align-items:center; padding:0 6px; flex-shrink:0;}
+  .score-center{display:flex; flex-direction:column; align-items:center; padding:4px 0; flex-shrink:0;}
   .score-nums{display:flex; align-items:center; gap:6px; font-family:'Rajdhani',sans-serif; font-size:28px; font-weight:700; color:var(--text-strong);}
   .score-sep{color:var(--text-5);}
   .clock{font-family:'JetBrains Mono',monospace; color:var(--text-3); font-size:11px; margin-top:6px; display:flex; align-items:center; gap:6px; white-space:nowrap;}
-  /* Layar sempit (HP): tumpuk Tim A / Skor / Tim B secara vertikal, bukan dipaksa sejajar,
-     supaya tombol Gol & Kartu langsung kelihatan tanpa perlu geser ke samping. */
-  @media(max-width:639px){
-    .score-row{flex-direction:column; align-items:stretch; gap:14px;}
-    .team-block{width:100%; flex:none; overflow:visible;}
-    .score-center{padding:4px 0;}
-  }
   @media(min-width:640px){
-    .score-row{gap:20px; justify-content:space-between;}
-    .team-block{min-width:210px; flex:initial; gap:12px; overflow:visible;}
-    .team-crest{height:56px; width:56px; font-size:18px;}
-    .team-info-name{font-size:17px;}
+    .team-crest{height:48px; width:48px; font-size:16px;}
+    .team-info-name{font-size:16px;}
     .card-row{font-size:11px; gap:10px;}
-    .scorer-list{font-size:10.5px; max-width:180px;}
-    .score-center{padding:0 12px;}
-    .score-nums{font-size:44px; gap:10px;}
+    .scorer-list{font-size:10.5px;}
+    .score-nums{font-size:36px; gap:10px;}
     .clock{font-size:13px; margin-top:8px;}
   }
 
