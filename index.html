@@ -354,7 +354,7 @@
   .bp-v-mid-label{position:absolute; z-index:2; left:50%; transform:translate(-50%,-50%); font-size:9.5px; color:rgba(255,255,255,.55); white-space:nowrap; background:linear-gradient(150deg,#2a1454,#3d1a6b); padding:2px 6px;}
   .bp-v-btn-wrap{position:absolute; z-index:2; left:50%; transform:translateX(-50%); white-space:nowrap;}
   .bp-v-center{flex-shrink:0; padding:0 14px; position:relative; z-index:2; width:150px;}
-  .bp-v-center-stack{position:absolute; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:5px; width:150px;}
+  .bp-v-center-stack{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:5px; width:150px;}
   .bp-v-center-label{font-family:'Rajdhani',sans-serif; font-weight:800; font-size:17px; color:#fff; letter-spacing:.06em; margin-top:2px;}
   .bp-v-center-sub{font-size:9.5px; color:rgba(255,255,255,.55); text-align:center; max-width:130px;}
   .bp-v-center-score{margin-top:2px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.22); border-radius:8px; padding:5px 14px; font-weight:800; color:#fff; font-size:13px; font-family:'Rajdhani',sans-serif;}
@@ -2053,12 +2053,12 @@ function bracketMatchEl(t, ri, mi, match){
   const row1 = h('div', {class:'bracket-team-row' + (match.winner==='a' ? ' bracket-winner-row' : '')}, [
     match.a!=='TBD' ? crestFor(match.a) : null,
     h('span', {class:'flex items-center gap-1', style:{minWidth:0, flex:'1'}}, [match.winner==='a' ? icon('trophy',11) : null, editableText(function(){return match.a;}, function(v){match.a=v;}, 'bracket-team-name')]),
-    editableNumber(function(){return match.scoreA;}, function(v){match.scoreA=v;}, 'font-bold')
+    match.winner ? h('span', {class:'font-bold'}, String(match.scoreA)) : null
   ]);
   const row2 = h('div', {class:'bracket-team-row' + (match.winner==='b' ? ' bracket-winner-row' : '')}, [
     match.b!=='TBD' ? crestFor(match.b) : null,
     h('span', {class:'flex items-center gap-1', style:{minWidth:0, flex:'1'}}, [match.winner==='b' ? icon('trophy',11) : null, editableText(function(){return match.b;}, function(v){match.b=v;}, 'bracket-team-name')]),
-    editableNumber(function(){return match.scoreB;}, function(v){match.scoreB=v;}, 'font-bold')
+    match.winner ? h('span', {class:'font-bold'}, String(match.scoreB)) : null
   ]);
   const el = h('div', {class:'bracket-match'}, [row1, row2]);
   if (match.note) el.appendChild(h('p', {class:'bracket-note'}, match.note));
@@ -2081,11 +2081,15 @@ function bpVTeamBox(t, match, isA){
   const isWinner = match.winner === (isA ? 'a' : 'b');
   const team = t.teams.find(function(tm){ return tm.name===name; });
   const crest = team ? (team.logoUrl ? h('img',{class:'bracket-team-crest', src:team.logoUrl}) : h('div', {class:'bracket-team-crest-fallback', style:{background:GRAD_CSS[team.color]||GRAD_CSS['grad-blue']}}, team.emoji||'⚽')) : null;
+  // Skor cuma ditampilkan kalau pertandingan ini sudah punya hasil (pemenang ditentukan) —
+  // sebelum itu (mis. masih fase penyisihan grup, semifinal belum dijadwalkan/dimainkan),
+  // jangan tampilkan "0" yang bisa disalahartikan seolah sudah ada hasil.
+  const scoreEl = match.winner ? h('span', {class:'font-bold'}, String(isA?match.scoreA:match.scoreB)) : null;
   return h('div', {class:'bp-v-team-box' + (isWinner?' winner':'') + (team?'':' placeholder')}, [
     crest,
     isWinner ? icon('trophy',11) : null,
     h('span', {class:'bp-v-name'}, name),
-    team ? editableNumber(function(){return isA?match.scoreA:match.scoreB;}, function(v){ if(isA) match.scoreA=v; else match.scoreB=v; }, 'font-bold') : null
+    scoreEl
   ]);
 }
 
@@ -2154,7 +2158,7 @@ function buildBracketPosterVShape(t, panel, rounds){
   const finalDone = isRealTeam(finalMatch.a) && isRealTeam(finalMatch.b);
   const championName = finalMatch.winner ? (finalMatch.winner==='a'?finalMatch.a:finalMatch.b) : null;
   const centerCol = h('div', {class:'bp-v-center', style:{height:totalH+'px'}});
-  const centerStack = h('div', {class:'bp-v-center-stack', style:{top:(yMid-15)+'px'}}, [
+  const centerStack = h('div', {class:'bp-v-center-stack'}, [
     icon('trophy', 30, 'gs-hero-trophy'),
     h('div', {class:'bp-v-center-label'}, rounds[1].name.toUpperCase()),
     h('div', {class:'bp-v-center-sub'}, finalDone ? (finalMatch.a+' vs '+finalMatch.b) : 'Menunggu Semifinalis'),
@@ -2280,45 +2284,62 @@ function buildBracketWinnerModal(t){
   const cfg = state.showBracketWinner; // {ri, mi}
   const round = t.bracket.rounds[cfg.ri];
   const match = round.matches[cfg.mi];
-  const isDraw = match.scoreA === match.scoreB;
   const isFinalRound = cfg.ri === t.bracket.rounds.length - 1;
   const nextRound = t.bracket.rounds[cfg.ri + 1];
 
-  const form = { penA: 0, penB: 0 };
+  const form = { scoreA: match.scoreA||0, scoreB: match.scoreB||0, penA: 0, penB: 0 };
 
   const overlay = h('div', {class:'modal-overlay', onclick:function(e){ if(e.target===overlay){ state.showBracketWinner=null; render(); } }});
   const box = h('div', {class:'modal-box', style:{maxWidth:'400px'}});
   box.appendChild(h('div', {class:'modal-head'}, [h('h3',{},'Tentukan Pemenang'), h('button',{class:'modal-close', onclick:function(){ state.showBracketWinner=null; render(); }}, icon('x',20))]));
 
   const body = h('div', {class:'flex-col gap-4'});
-  body.appendChild(h('p', {class:'text-sm', style:{margin:0}}, match.a + ' ' + match.scoreA + ' - ' + match.scoreB + ' ' + match.b));
 
-  const statusMsg = h('p', {class:'text-xs muted', style:{margin:0}});
+  // Skor pertandingan diisi di sini (bukan langsung di tampilan bagan) — supaya bagan tidak
+  // menampilkan angka "0-0" seolah pertandingan sudah berjalan padahal belum dijadwalkan.
+  const scoreRow = h('div', {class:'form-row cols-2'});
+  const aScoreInp = h('input', {type:'number', class:'form-input', min:0, value:form.scoreA});
+  const bScoreInp = h('input', {type:'number', class:'form-input', min:0, value:form.scoreB});
+  scoreRow.appendChild(h('div', {}, [h('label',{class:'form-label'}, 'Skor '+match.a), aScoreInp]));
+  scoreRow.appendChild(h('div', {}, [h('label',{class:'form-label'}, 'Skor '+match.b), bScoreInp]));
+  body.appendChild(scoreRow);
 
-  if (!isDraw){
-    const winnerName = match.scoreA > match.scoreB ? match.a : match.b;
-    body.appendChild(h('p', {class:'text-xs muted', style:{margin:0}}, 'Skor tidak imbang — pemenangnya adalah ' + winnerName + '.'));
-    body.appendChild(h('button', {class:'btn btn-primary w-full', style:{padding:'12px'}, onclick:function(){
-      applyWinner(match.scoreA > match.scoreB ? 'a' : 'b', null, null);
-    }}, [icon('trophy',16), isFinalRound ? 'Jadikan Juara' : 'Simpan & Lanjutkan ke Babak Berikutnya']));
-  } else {
-    body.appendChild(h('p', {class:'text-xs muted', style:{margin:0}}, 'Skor imbang — masukkan hasil adu penalti untuk menentukan pemenang.'));
-    const row = h('div', {class:'form-row cols-2'});
-    const aInp = h('input', {type:'number', class:'form-input', min:0, value:0});
-    aInp.addEventListener('input', function(e){ form.penA = parseInt(e.target.value,10)||0; });
-    const bInp = h('input', {type:'number', class:'form-input', min:0, value:0});
-    bInp.addEventListener('input', function(e){ form.penB = parseInt(e.target.value,10)||0; });
-    row.appendChild(h('div', {}, [h('label',{class:'form-label'}, 'Penalti ' + match.a), aInp]));
-    row.appendChild(h('div', {}, [h('label',{class:'form-label'}, 'Penalti ' + match.b), bInp]));
-    body.appendChild(row);
-    body.appendChild(statusMsg);
-    body.appendChild(h('button', {class:'btn btn-primary w-full', style:{padding:'12px'}, onclick:function(){
-      if (form.penA === form.penB){ statusMsg.textContent = 'Hasil adu penalti tidak boleh imbang.'; return; }
-      applyWinner(form.penA > form.penB ? 'a' : 'b', form.penA, form.penB);
-    }}, [icon('trophy',16), isFinalRound ? 'Jadikan Juara' : 'Simpan & Lanjutkan ke Babak Berikutnya']));
+  const dynamicWrap = h('div', {class:'flex-col gap-4'});
+  body.appendChild(dynamicWrap);
+
+  function refreshDynamic(){
+    dynamicWrap.innerHTML = '';
+    const isDraw = form.scoreA === form.scoreB;
+    if (!isDraw){
+      const winnerName = form.scoreA > form.scoreB ? match.a : match.b;
+      dynamicWrap.appendChild(h('p', {class:'text-xs muted', style:{margin:0}}, 'Pemenangnya adalah ' + winnerName + '.'));
+      dynamicWrap.appendChild(h('button', {class:'btn btn-primary w-full', style:{padding:'12px'}, onclick:function(){
+        applyWinner(form.scoreA > form.scoreB ? 'a' : 'b', null, null);
+      }}, [icon('trophy',16), isFinalRound ? 'Jadikan Juara' : 'Simpan & Lanjutkan ke Babak Berikutnya']));
+    } else {
+      dynamicWrap.appendChild(h('p', {class:'text-xs muted', style:{margin:0}}, 'Skor imbang — masukkan hasil adu penalti untuk menentukan pemenang.'));
+      const row = h('div', {class:'form-row cols-2'});
+      const aInp = h('input', {type:'number', class:'form-input', min:0, value:0});
+      aInp.addEventListener('input', function(e){ form.penA = parseInt(e.target.value,10)||0; });
+      const bInp = h('input', {type:'number', class:'form-input', min:0, value:0});
+      bInp.addEventListener('input', function(e){ form.penB = parseInt(e.target.value,10)||0; });
+      row.appendChild(h('div', {}, [h('label',{class:'form-label'}, 'Penalti ' + match.a), aInp]));
+      row.appendChild(h('div', {}, [h('label',{class:'form-label'}, 'Penalti ' + match.b), bInp]));
+      dynamicWrap.appendChild(row);
+      const statusMsg = h('p', {class:'text-xs muted', style:{margin:0}});
+      dynamicWrap.appendChild(statusMsg);
+      dynamicWrap.appendChild(h('button', {class:'btn btn-primary w-full', style:{padding:'12px'}, onclick:function(){
+        if (form.penA === form.penB){ statusMsg.textContent = 'Hasil adu penalti tidak boleh imbang.'; return; }
+        applyWinner(form.penA > form.penB ? 'a' : 'b', form.penA, form.penB);
+      }}, [icon('trophy',16), isFinalRound ? 'Jadikan Juara' : 'Simpan & Lanjutkan ke Babak Berikutnya']));
+    }
   }
+  aScoreInp.addEventListener('input', function(e){ form.scoreA = parseInt(e.target.value,10)||0; refreshDynamic(); });
+  bScoreInp.addEventListener('input', function(e){ form.scoreB = parseInt(e.target.value,10)||0; refreshDynamic(); });
+  refreshDynamic();
 
   function applyWinner(side, penA, penB){
+    match.scoreA = form.scoreA; match.scoreB = form.scoreB;
     match.winner = side;
     if (penA!==null && penB!==null) match.note = 'Menang Adu Penalti ' + penA + '-' + penB;
     const winnerName = side==='a' ? match.a : match.b;
