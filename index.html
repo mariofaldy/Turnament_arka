@@ -1834,8 +1834,21 @@ function buildGroupStandings(t){
         h('div', {class:'gs-match-score'}, s.scoreA+' - '+s.scoreB),
         h('div', {class:'gs-match-team right'}, [teamLogoEl(teamB||{emoji:'⚽',color:'grad-blue'},22), h('span',{class:'gs-match-team-name'}, teamB?teamB.name:'Tim Dihapus')]),
       ]));
-      const eventsA = (s.scorersA||[]).map(function(sc){ return (sc.minute+"' ") + sc.name + (sc.penalty?' (P)':''); }).concat((s.cardsA||[]).map(function(c){ return (c.type==='red'?'🟥 ':'🟨 ') + c.name + ' ' + c.minute+"'"; }));
-      const eventsB = (s.scorersB||[]).map(function(sc){ return (sc.minute+"' ") + sc.name + (sc.penalty?' (P)':''); }).concat((s.cardsB||[]).map(function(c){ return (c.type==='red'?'🟥 ':'🟨 ') + c.name + ' ' + c.minute+"'"; }));
+      // Gol dari pemain yang sama digabung jadi satu baris (nama sekali aja), menitnya
+      // ditulis berurutan dipisah koma — mis. "R. Aditya 12', 45'" bukan dua baris terpisah.
+      function formatScorerLines(scorers){
+        const order = [], byName = {};
+        (scorers||[]).forEach(function(sc){
+          if (!byName[sc.name]){ byName[sc.name]=[]; order.push(sc.name); }
+          byName[sc.name].push(sc);
+        });
+        return order.map(function(name){
+          const minutes = byName[name].map(function(sc){ return sc.minute+"'"+(sc.penalty?' (P)':''); }).join(', ');
+          return name + ' ' + minutes;
+        });
+      }
+      const eventsA = formatScorerLines(s.scorersA).concat((s.cardsA||[]).map(function(c){ return (c.type==='red'?'🟥 ':'🟨 ') + c.name + ' ' + c.minute+"'"; }));
+      const eventsB = formatScorerLines(s.scorersB).concat((s.cardsB||[]).map(function(c){ return (c.type==='red'?'🟥 ':'🟨 ') + c.name + ' ' + c.minute+"'"; }));
       if (eventsA.length || eventsB.length){
         const scorersWrap = h('div', {class:'gs-match-scorers'});
         const colA = h('div', {class:'side-a'}, eventsA.map(function(txt){ return h('p',{style:{margin:'0 0 2px'}}, txt); }));
