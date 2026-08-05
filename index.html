@@ -887,10 +887,13 @@ const NAV_ITEMS = [
 /* =========================================================================
    RENDER (full re-render on every state mutation that isn't a live text edit)
    ========================================================================= */
-function render(){
+function renderLocal(){
   const root = document.getElementById('root');
   root.innerHTML = '';
   root.appendChild(buildApp());
+}
+function render(){
+  renderLocal();
   scheduleSave();
 }
 
@@ -1501,7 +1504,13 @@ function ensureLiveTimer(){
     if (m>=totalMin) return;
     t.liveMatch.minute = m; t.liveMatch.second = s;
     if (shouldSkipAutoRender()) return;
-    render();
+    // Jam berjalan tiap detik cuma diperbarui LOKAL di layar ini — kalau tiap detik juga
+    // dikirim penuh ke Firebase, koneksi (apalagi di HP/data seluler) kebanjiran kiriman
+    // dan bikin device lain lambat nerima update. Kirim ke cloud cukup tiap 5 detik saja;
+    // perubahan penting (gol, kartu, skor, jeda, selesai) tetap langsung terkirim seperti biasa
+    // karena itu semua manggil render() biasa, bukan lewat sini.
+    renderLocal();
+    if (s % 5 === 0) scheduleSave();
   }, 1000);
 }
 
@@ -3171,10 +3180,18 @@ let fbUser = null;
 function fbSnapshotData(){
   return { tournaments: state.tournaments, activeId: state.activeId, savedAt: Date.now() };
 }
+let localDataSavedAt = 0; // waktu data lokal terakhir disimpan — dipakai buat menolak data server yang lebih basi
 function fbApplySnapshot(data){
-  if (!data || !Array.isArray(data.tournaments) || data.tournaments.length===0) return;
+  if (!data || !Array.isArray(data.tournaments) || data.tournaments.length===0) return true;
+  // Kalau data dari server ternyata LEBIH LAMA dari data yang sudah kita punya secara lokal
+  // (mis. baru saja refresh sebelum tulisan sempat sampai ke server karena koneksi lambat),
+  // JANGAN ditimpa — pertahankan data lokal yang lebih baru dan biarkan penulisan berikutnya
+  // memperbaiki data di server. Ini yang mencegah "hasil pertandingan hilang pas refresh".
+  if (data.savedAt && localDataSavedAt && data.savedAt < localDataSavedAt) return false;
   state.tournaments = data.tournaments;
   state.activeId = (data.activeId && data.tournaments.some(function(t){return t.id===data.activeId;})) ? data.activeId : data.tournaments[0].id;
+  if (data.savedAt) localDataSavedAt = data.savedAt;
+  return true;
 }
 function fbStatusLabel(s){
   const labels = {
@@ -3217,11 +3234,13 @@ function loadThemeFromLocalStorage(){
 }
 function saveToLocalStorage(){
   try{
+    const savedAt = Date.now();
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
       tournaments: state.tournaments,
       activeId: state.activeId,
-      savedAt: Date.now()
+      savedAt: savedAt
     }));
+    localDataSavedAt = savedAt;
   } catch(err){ console.error('Gagal menyimpan ke penyimpanan lokal:', err); }
 }
 function loadFromLocalStorage(){
@@ -3234,6 +3253,7 @@ function loadFromLocalStorage(){
     state.activeId = (data.activeId && data.tournaments.some(function(t){return t.id===data.activeId;}))
       ? data.activeId
       : data.tournaments[0].id;
+    localDataSavedAt = data.savedAt || 0; // dipakai buat menolak data server yang lebih basi setelah refresh
     return true;
   } catch(err){ console.error('Gagal memuat dari penyimpanan lokal:', err); return false; }
 }
@@ -3281,7 +3301,14 @@ function initFirebase(){
   const docRef = fbDb.collection(FB_COLLECTION).doc(FB_DOC);
   docRef.get().then(function(snap){
     if (snap.exists){
-      fbApplyingRemote = true; fbApplySnapshot(snap.data()); fbApplyingRemote = false;
+      fbApplyingRemote = true;
+      const applied = fbApplySnapshot(snap.data());
+      fbApplyingRemote = false;
+      if (!applied && fbUser){
+        // Data di server ternyata lebih basi dari data lokal kita (mis. sempat refresh sebelum
+        // tulisan sebelumnya sampai ke server) — kirim ulang data lokal yang benar ke server.
+        scheduleSave();
+      }
     } else if (fbUser){
       // Hanya admin yang sudah login yang bisa membuat dokumen data awal.
       docRef.set(fbSnapshotData()).catch(function(err){ console.error('Gagal membuat data awal di Firebase:', err); });
@@ -3295,7 +3322,10 @@ function initFirebase(){
       // dari snapshot ini — nanti begitu tulisan lokal kelar, snapshot barunya yang
       // sudah termasuk perubahan itu akan datang dan diterapkan seperti biasa.
       if (fbWritePending) return;
-      fbApplyingRemote = true; fbApplySnapshot(snap.data()); fbApplyingRemote = false;
+      fbApplyingRemote = true;
+      const applied = fbApplySnapshot(snap.data());
+      fbApplyingRemote = false;
+      if (!applied && fbUser){ scheduleSave(); return; }
       safeRender();
     }, function(err){
       console.error('Firebase realtime sync error:', err);
@@ -3315,6 +3345,15 @@ loadThemeFromLocalStorage();
 render(); // tampilkan data lokal dulu biar halaman tidak blank sambil menunggu Firebase
 ensureLiveTimer();
 initFirebase();
+
+// Peringatkan kalau mau menutup/refresh halaman padahal masih ada data yang belum sempat
+// terkirim ke server — supaya tidak diam-diam hilang karena buru-buru refresh.
+window.addEventListener('beforeunload', function(e){
+  if (fbWritePending){
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 </script>
 </body>
 </html>
