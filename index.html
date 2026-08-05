@@ -1721,17 +1721,19 @@ function groupWinner(t, groupId){
 // Isi otomatis babak pertama bagan (biasanya Semifinal) dengan nama juara tiap grup,
 // supaya langsung kelihatan siapa yang sudah lolos — dipanggil setiap hasil pertandingan
 // fase grup berubah, dan juga bisa dipicu manual dari halaman Bagan.
+// Pola pasangan silang: Juara Grup A vs Juara Grup C (Semifinal 1), Juara Grup B vs Juara Grup D (Semifinal 2).
 function syncBracketFromGroupWinners(t){
   if (!t.bracket || !t.groups || t.groups.length < 2) return;
   const round0 = t.bracket.rounds[0];
   if (!round0) return;
   // Hanya jalan kalau jumlah grup pas dua kali jumlah pertandingan di babak pertama
   // (mis. 4 grup -> 2 pertandingan semifinal). Kalau formatnya beda, jangan dipaksa.
-  if (t.groups.length !== round0.matches.length * 2) return;
-  for (let mi=0; mi<round0.matches.length; mi++){
+  const numMatches = round0.matches.length;
+  if (t.groups.length !== numMatches * 2) return;
+  for (let mi=0; mi<numMatches; mi++){
     const m = round0.matches[mi];
     if (m.winner) continue; // pertandingan ini sudah ada hasilnya, jangan diganggu
-    const gA = t.groups[mi*2], gB = t.groups[mi*2+1];
+    const gA = t.groups[mi], gB = t.groups[mi + numMatches];
     const wA = gA ? groupWinner(t, gA.id) : null;
     const wB = gB ? groupWinner(t, gB.id) : null;
     if (wA) m.a = wA.name;
