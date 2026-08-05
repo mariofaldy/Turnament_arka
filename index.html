@@ -59,7 +59,8 @@
   .sidebar-overlay.show{display:block;}
   .main-wrap{flex:1; display:flex; flex-direction:column; min-width:0;}
   @media(min-width:1024px){
-    .sidebar{position:static; transform:none; height:100vh;}
+    .sidebar{position:fixed; transform:none; height:100vh;}
+    .main-wrap{margin-left:280px;}
     .sidebar-overlay{display:none !important;}
     .hamburger{display:none !important;}
   }
