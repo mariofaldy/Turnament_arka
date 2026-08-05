@@ -1037,7 +1037,7 @@ function buildAddFixtureEventModal(t){
   if (!s[scorersKey]) s[scorersKey] = [];
   if (!s[cardsKey]) s[cardsKey] = [];
 
-  const form = { name:'', cardType:'yellow', minute:0, isPenalty:false };
+  const form = { name:'', cardType:'yellow', minute:0, isPenalty:false, alsoScore:false };
 
   const close = function(){ state.showAddFixtureEvent = null; render(); };
   const overlay = h('div', {class:'modal-overlay', onclick:function(e){ if(e.target===overlay) close(); }});
@@ -1096,8 +1096,13 @@ function buildAddFixtureEventModal(t){
   body.appendChild(minuteWrap);
 
   if (cfg.type === 'goal'){
-    const noteWrap = h('p', {class:'text-xs muted', style:{margin:0}}, 'Skor akan otomatis bertambah +1 untuk ' + teamName + '.');
-    body.appendChild(noteWrap);
+    const scoreWrap = h('label', {class:'flex items-center gap-2', style:{cursor:'pointer'}});
+    const scoreChk = h('input', {type:'checkbox'});
+    scoreChk.addEventListener('change', function(e){ form.alsoScore = e.target.checked; });
+    scoreWrap.appendChild(scoreChk);
+    scoreWrap.appendChild(h('span', {class:'text-xs'}, 'Ini gol baru — tambahkan +1 ke skor ' + teamName));
+    body.appendChild(scoreWrap);
+    body.appendChild(h('p', {class:'text-xs muted', style:{margin:0}}, 'Biarkan tidak dicentang kalau lo cuma mau mencatat nama pencetak gol yang sudah terhitung di skor saat ini.'));
   }
 
   body.appendChild(statusMsg);
@@ -1109,8 +1114,10 @@ function buildAddFixtureEventModal(t){
     try{
       if (cfg.type === 'goal'){
         s[scorersKey].push({name:name, minute:minute, penalty: !!form.isPenalty});
-        const newScore = (cfg.side==='A' ? (s.scoreA||0) : (s.scoreB||0)) + 1;
-        setFixtureScore(t, s, cfg.side==='A' ? 'a' : 'b', newScore);
+        if (form.alsoScore){
+          const newScore = (cfg.side==='A' ? (s.scoreA||0) : (s.scoreB||0)) + 1;
+          setFixtureScore(t, s, cfg.side==='A' ? 'a' : 'b', newScore);
+        }
         if (!t.topScorers) t.topScorers = [];
         const existing = t.topScorers.find(function(p){ return p.name.toLowerCase()===name.toLowerCase() && p.team===teamName; });
         if (existing) existing.goals = (existing.goals||0) + 1;
