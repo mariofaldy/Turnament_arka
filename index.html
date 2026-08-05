@@ -217,6 +217,54 @@
     .ls-divider{margin:22px 0 16px;}
   }
 
+  /* ---- Klasemen Grup (hasil pertandingan + tabel gaya "match center") ---- */
+  .gs-panel{padding:0; overflow:hidden;}
+  .gs-hero{position:relative; overflow:hidden; padding:22px 20px 18px; background:linear-gradient(135deg,#0b1130 0%,#151b45 55%,#1c1440 100%);}
+  .gs-hero-glow{position:absolute; top:-80px; right:-60px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle, rgba(245,158,11,.35), transparent 70%); filter:blur(20px); pointer-events:none;}
+  .gs-hero-top{position:relative; display:flex; align-items:flex-start; justify-content:space-between; gap:12px;}
+  .gs-hero-eyebrow{font-size:10.5px; letter-spacing:.25em; color:var(--acc-amber-text); font-weight:700; margin:0 0 4px;}
+  .gs-hero-title{font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:800; color:#fff; margin:0; letter-spacing:.02em; line-height:1.15; word-break:break-word;}
+  .gs-hero-trophy{color:var(--acc-amber-text); flex-shrink:0; opacity:.9;}
+  .gs-hero-badge{position:relative; display:inline-flex; align-items:center; margin-top:14px; padding:6px 16px; background:linear-gradient(135deg,#dc2626,#991b1b); border-radius:8px; font-family:'Rajdhani',sans-serif; font-weight:800; font-size:14px; color:#fff; letter-spacing:.04em;}
+  .gs-tabs-wrap{padding:14px 18px 0;}
+  .gs-cols{display:grid; grid-template-columns:1fr; gap:16px; padding:18px;}
+  @media(min-width:900px){ .gs-cols{grid-template-columns:1fr 1.15fr;} }
+  .gs-results{background:var(--surface-2); border:1px solid var(--border); border-radius:14px; overflow:hidden;}
+  .gs-results-head, .gs-table-head{font-weight:800; font-size:11.5px; letter-spacing:.08em; text-align:center; padding:9px; text-transform:uppercase; color:#fff;}
+  .gs-results-head{background:linear-gradient(135deg,#f59e0b,#d97706); color:#1c1207;}
+  .gs-table-head{background:linear-gradient(135deg,#1e3a8a,#0f172a);}
+  .gs-matchday-label{font-size:10px; font-weight:700; letter-spacing:.1em; color:var(--muted); text-transform:uppercase; padding:10px 12px 4px;}
+  .gs-match-card{margin:0 12px 10px; padding:10px 12px; background:var(--panel); border:1px solid var(--border); border-radius:10px;}
+  .gs-match-teams{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .gs-match-team{display:flex; align-items:center; gap:6px; min-width:0; flex:1;}
+  .gs-match-team.right{flex-direction:row-reverse; text-align:right;}
+  .gs-match-team-name{font-size:12px; font-weight:600; color:var(--text-heading); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .gs-match-score{font-family:'Rajdhani',sans-serif; font-weight:800; font-size:15px; color:var(--text-strong); background:var(--surface-3); padding:3px 10px; border-radius:6px; flex-shrink:0;}
+  .gs-match-scorers{margin-top:8px; display:grid; grid-template-columns:1fr 1fr; gap:3px 8px; font-size:9.5px; color:var(--muted);}
+  .gs-match-scorers .side-a{text-align:left;}
+  .gs-match-scorers .side-b{text-align:right;}
+  .gs-match-empty{padding:26px 16px; text-align:center; color:var(--muted); font-size:12px;}
+  .gs-table-wrap{background:var(--surface-2); border:1px solid var(--border); border-radius:14px; overflow:hidden;}
+  .gs-table-inner table{width:100%; border-collapse:collapse; font-size:11px;}
+  .gs-table-inner th{padding:8px 5px; color:var(--muted); font-size:9.5px; text-transform:uppercase; letter-spacing:.03em; border-bottom:1px solid var(--border); white-space:nowrap;}
+  .gs-table-inner td{padding:7px 5px; border-bottom:1px solid var(--border);}
+  .gs-pos-badge{display:inline-flex; align-items:center; justify-content:center; height:21px; width:21px; border-radius:50%; font-weight:800; font-size:10.5px; color:#fff; background:var(--surface-3);}
+  .gs-pos-badge.gold{background:linear-gradient(135deg,#f59e0b,#b45309);}
+  .gs-pos-badge.silver{background:linear-gradient(135deg,#e2e8f0,#94a3b8); color:#1e293b;}
+  .gs-pos-badge.bronze{background:linear-gradient(135deg,#d97706,#78350f);}
+  .gs-row-winner{background:rgba(245,158,11,.08);}
+  .gs-status-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; padding:0 18px 18px;}
+  @media(min-width:640px){ .gs-status-grid{grid-template-columns:repeat(4,1fr);} }
+  .gs-status-card{text-align:center; padding:14px 8px; border-radius:12px; border:1px solid var(--border);}
+  .gs-status-card.gold{background:rgba(245,158,11,.1); border-color:rgba(245,158,11,.35);}
+  .gs-status-card.silver{background:rgba(148,163,184,.1); border-color:rgba(148,163,184,.35);}
+  .gs-status-card.bronze{background:rgba(217,119,6,.1); border-color:rgba(217,119,6,.35);}
+  .gs-status-card.out{background:rgba(239,68,68,.08); border-color:rgba(239,68,68,.3);}
+  .gs-status-icon{margin:0 auto 6px;}
+  .gs-status-team{font-weight:700; font-size:11.5px; color:var(--text-heading); margin:0 0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .gs-status-label{font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin:0 0 2px;}
+  .gs-status-note{font-size:9px; color:var(--muted); margin:0;}
+
   /* editable */
   input, select, button, textarea{ font-family:inherit; font-size:inherit; color:inherit; }
   .inline-edit{
@@ -1671,23 +1719,41 @@ function finalizeLiveMatch(t){
 
 let standingsActiveGroup = null;
 function buildGroupStandings(t){
-  const panel = h('div', {class:'panel'});
-
-  const addGroupBtn = state.adminMode ? h('button', {class:'btn btn-ghost-purple', onclick:function(){
-    t.groups.push({id:nextId(), name:'Grup '+String.fromCharCode(65+t.groups.length)});
-    render();
-  }}, [icon('plus',13), 'Tambah Grup']) : null;
-  panel.appendChild(sectionTitle('list', 'Klasemen Grup', addGroupBtn));
+  const panel = h('div', {class:'panel gs-panel'});
 
   if (t.format === 'knockout'){
-    panel.appendChild(h('p', {class:'text-sm muted'}, 'Turnamen ini menggunakan format knockout, tidak ada fase grup.'));
+    const inner = h('div', {style:{padding:'20px'}});
+    inner.appendChild(sectionTitle('list', 'Klasemen Grup'));
+    inner.appendChild(h('p', {class:'text-sm muted'}, 'Turnamen ini menggunakan format knockout, tidak ada fase grup.'));
+    panel.appendChild(inner);
     return panel;
   }
 
   const groupList = t.groups.length ? t.groups : [{id:null,name:'Semua Tim'}];
   if (!groupList.find(function(g){return g.id===standingsActiveGroup;})) standingsActiveGroup = groupList[0].id;
+  const activeGroup = groupList.find(function(g){return g.id===standingsActiveGroup;}) || groupList[0];
 
-  if (groupList.length > 1 || (state.adminMode && t.groups.length > 0)){
+  // ---- HERO: nama turnamen + badge grup aktif ----
+  const hero = h('div', {class:'gs-hero'}, [
+    h('div', {class:'gs-hero-glow'}),
+    h('div', {class:'gs-hero-top'}, [
+      h('div', {}, [
+        h('p', {class:'gs-hero-eyebrow'}, 'KLASEMEN'),
+        h('h2', {class:'gs-hero-title'}, t.name.toUpperCase()),
+      ]),
+      icon('trophy', 34, 'gs-hero-trophy')
+    ]),
+    h('div', {class:'gs-hero-badge'}, activeGroup.name.toUpperCase())
+  ]);
+  panel.appendChild(hero);
+
+  // ---- Tab pilih grup + kelola grup (admin) ----
+  const addGroupBtn = state.adminMode ? h('button', {class:'btn btn-ghost-purple', style:{fontSize:'11px', padding:'6px 10px'}, onclick:function(){
+    t.groups.push({id:nextId(), name:'Grup '+String.fromCharCode(65+t.groups.length)});
+    render();
+  }}, [icon('plus',12), 'Tambah Grup']) : null;
+  if (groupList.length > 1 || (state.adminMode && t.groups.length > 0) || addGroupBtn){
+    const tabsWrap = h('div', {class:'gs-tabs-wrap'});
     const tabs = h('div', {class:'group-tabs'});
     groupList.forEach(function(g){
       const tabWrap = h('div', {class:'flex items-center gap-1'});
@@ -1702,30 +1768,77 @@ function buildGroupStandings(t){
       }
       tabs.appendChild(tabWrap);
     });
-    panel.appendChild(tabs);
+    if (addGroupBtn) tabs.appendChild(addGroupBtn);
+    tabsWrap.appendChild(tabs);
+    panel.appendChild(tabsWrap);
   }
 
   const filtered = groupList.length<=1 ? t.teams : t.teams.filter(function(tm){return tm.groupId===standingsActiveGroup;});
   const sorted = filtered.slice().sort(function(a,b){ return b.stats.pts-a.stats.pts || b.stats.gd-a.stats.gd || (b.stats.gf||0)-(a.stats.gf||0); });
 
-  const wrap = h('div', {class:'table-wrap'});
-  const headCells = [h('th',{},'#'),h('th',{},'Tim')];
-  if (t.groups.length > 0) headCells.push(h('th',{style:{textAlign:'center'}},'Grup'));
+  // ---- Dua kolom: Hasil Pertandingan (kiri) + Tabel Klasemen (kanan) ----
+  const cols = h('div', {class:'gs-cols'});
+
+  // -- Kolom kiri: hasil pertandingan tim-tim di grup ini, dikelompokkan per matchday --
+  const results = h('div', {class:'gs-results'});
+  results.appendChild(h('div', {class:'gs-results-head'}, 'Hasil Pertandingan'));
+  function groupIdOfTeam(teamId){ const tm=t.teams.find(function(x){return x.id===teamId;}); return tm ? tm.groupId : undefined; }
+  const groupMatches = t.schedule.filter(function(s){
+    return s.status==='finished' && groupIdOfTeam(s.teamAId)===activeGroup.id && groupIdOfTeam(s.teamBId)===activeGroup.id;
+  });
+  if (groupMatches.length===0){
+    results.appendChild(h('div', {class:'gs-match-empty'}, 'Belum ada hasil pertandingan di grup ini.'));
+  } else {
+    const perMatchday = Math.max(1, Math.floor(sorted.length/2));
+    groupMatches.forEach(function(s, i){
+      if (i % perMatchday === 0){
+        results.appendChild(h('div', {class:'gs-matchday-label'}, 'Matchday ' + (Math.floor(i/perMatchday)+1)));
+      }
+      const teamA = t.teams.find(function(x){return x.id===s.teamAId;});
+      const teamB = t.teams.find(function(x){return x.id===s.teamBId;});
+      const card = h('div', {class:'gs-match-card'});
+      card.appendChild(h('div', {class:'gs-match-teams'}, [
+        h('div', {class:'gs-match-team'}, [teamLogoEl(teamA||{emoji:'⚽',color:'grad-blue'},22), h('span',{class:'gs-match-team-name'}, teamA?teamA.name:'Tim Dihapus')]),
+        h('div', {class:'gs-match-score'}, s.scoreA+' - '+s.scoreB),
+        h('div', {class:'gs-match-team right'}, [teamLogoEl(teamB||{emoji:'⚽',color:'grad-blue'},22), h('span',{class:'gs-match-team-name'}, teamB?teamB.name:'Tim Dihapus')]),
+      ]));
+      const eventsA = (s.scorersA||[]).map(function(sc){ return (sc.minute+"' ") + sc.name + (sc.penalty?' (P)':''); }).concat((s.cardsA||[]).map(function(c){ return (c.type==='red'?'🟥 ':'🟨 ') + c.name + ' ' + c.minute+"'"; }));
+      const eventsB = (s.scorersB||[]).map(function(sc){ return (sc.minute+"' ") + sc.name + (sc.penalty?' (P)':''); }).concat((s.cardsB||[]).map(function(c){ return (c.type==='red'?'🟥 ':'🟨 ') + c.name + ' ' + c.minute+"'"; }));
+      if (eventsA.length || eventsB.length){
+        const scorersWrap = h('div', {class:'gs-match-scorers'});
+        const colA = h('div', {class:'side-a'}, eventsA.map(function(txt){ return h('p',{style:{margin:'0 0 2px'}}, txt); }));
+        const colB = h('div', {class:'side-b'}, eventsB.map(function(txt){ return h('p',{style:{margin:'0 0 2px'}}, txt); }));
+        scorersWrap.appendChild(colA); scorersWrap.appendChild(colB);
+        card.appendChild(scorersWrap);
+      }
+      results.appendChild(card);
+    });
+  }
+  cols.appendChild(results);
+
+  // -- Kolom kanan: tabel klasemen --
+  const tableWrapOuter = h('div', {class:'gs-table-wrap'});
+  tableWrapOuter.appendChild(h('div', {class:'gs-table-head'}, 'Klasemen ' + activeGroup.name));
+  const tableInner = h('div', {class:'gs-table-inner table-wrap'});
+  const headCells = [h('th',{},'Pos'),h('th',{},'Tim')];
+  if (t.groups.length > 0 && groupList.length<=1) headCells.push(h('th',{style:{textAlign:'center'}},'Grup'));
   headCells.push(
-    h('th',{style:{textAlign:'center'}},'Main'), h('th',{style:{textAlign:'center'}},'M'),
+    h('th',{style:{textAlign:'center'}},'M'), h('th',{style:{textAlign:'center'}},'M'),
     h('th',{style:{textAlign:'center'}},'S'), h('th',{style:{textAlign:'center'}},'K'),
     h('th',{style:{textAlign:'center'}},'GM'), h('th',{style:{textAlign:'center'}},'GK'),
-    h('th',{style:{textAlign:'center'}},'SG'), h('th',{style:{textAlign:'center'}},'Pts'),
+    h('th',{style:{textAlign:'center'}},'SG'), h('th',{style:{textAlign:'center'}},'Poin'),
     h('th',{style:{textAlign:'center'}},'KK'), h('th',{style:{textAlign:'center'}},'KM')
   );
   const table = h('table', {}, [ h('thead',{}, h('tr',{},headCells)) ]);
   const tbody = h('tbody');
+  const showGroupCol = t.groups.length > 0 && groupList.length<=1;
   sorted.forEach(function(tm, idx){
     const isWinner = idx===0 && sorted.length>0;
-    const tr = h('tr', {class: isWinner ? 'row-top' : ''});
-    tr.appendChild(h('td', {}, h('span',{class:'rank-badge'+(isWinner?' top':'')}, isWinner ? icon('trophy',12) : String(idx+1))));
-    tr.appendChild(h('td', {}, h('div',{class:'flex items-center gap-2'},[teamLogoEl(tm,26), editableText(function(){return tm.name;}, function(v){tm.name=v;}, 'font-medium')])));
-    if (t.groups.length > 0){
+    const posClass = idx===0?'gold':(idx===1?'silver':(idx===2?'bronze':''));
+    const tr = h('tr', {class: isWinner ? 'gs-row-winner' : ''});
+    tr.appendChild(h('td', {}, h('span',{class:'gs-pos-badge '+posClass}, String(idx+1))));
+    tr.appendChild(h('td', {}, h('div',{class:'flex items-center gap-2'},[teamLogoEl(tm,24), editableText(function(){return tm.name;}, function(v){tm.name=v;}, 'font-medium')])));
+    if (showGroupCol){
       let groupCell;
       if (state.adminMode){
         const sel = h('select', {class:'form-input', style:{padding:'4px 6px', fontSize:'11px', width:'auto'}}, [h('option',{value:''},'Tanpa Grup')].concat(t.groups.map(function(g){ return h('option',{value:g.id}, g.name); })));
@@ -1750,10 +1863,36 @@ function buildGroupStandings(t){
     tr.appendChild(h('td', {style:{textAlign:'center'}}, [h('span',{class:'card-r', style:{marginRight:'4px'}}), editableNumber(function(){return tm.fairplay.red||0;}, function(v){tm.fairplay.red=v;}, '')]));
     tbody.appendChild(tr);
   });
-  if (sorted.length===0){ tbody.appendChild(h('tr', {}, h('td', {colspan: t.groups.length>0?13:12, style:{textAlign:'center', color:'#64748b', padding:'20px 0'}}, 'Belum ada tim di grup ini.'))); }
+  if (sorted.length===0){ tbody.appendChild(h('tr', {}, h('td', {colspan: showGroupCol?13:12, style:{textAlign:'center', color:'#64748b', padding:'20px 0'}}, 'Belum ada tim di grup ini.'))); }
   table.appendChild(tbody);
-  wrap.appendChild(table);
-  panel.appendChild(wrap);
+  tableInner.appendChild(table);
+  tableWrapOuter.appendChild(tableInner);
+  cols.appendChild(tableWrapOuter);
+
+  panel.appendChild(cols);
+
+  // ---- Kartu status kualifikasi tiap tim di grup ini ----
+  if (sorted.length > 0){
+    const nextRoundName = (t.bracket && t.bracket.rounds && t.bracket.rounds[0]) ? t.bracket.rounds[0].name : 'babak berikutnya';
+    const qualifyCount = t.onlyGroupWinners ? 1 : 2;
+    const statusGrid = h('div', {class:'gs-status-grid'});
+    sorted.forEach(function(tm, idx){
+      let cls, iconName, label, note;
+      if (idx===0){ cls='gold'; iconName='trophy'; label='Juara Grup'; note='Lolos ke '+nextRoundName; }
+      else if (idx===1 && qualifyCount>=2){ cls='silver'; iconName='star'; label='Runner-up'; note='Lolos ke '+nextRoundName; }
+      else if (idx===1){ cls='silver'; iconName='star'; label='Peringkat 2'; note='Tersingkir dari turnamen'; }
+      else if (idx===sorted.length-1){ cls='out'; iconName='x'; label='Juru Kunci'; note='Tersingkir dari turnamen'; }
+      else { cls='bronze'; iconName='shield'; label='Peringkat '+(idx+1); note='Tersingkir dari turnamen'; }
+      statusGrid.appendChild(h('div', {class:'gs-status-card '+cls}, [
+        icon(iconName, 22, 'gs-status-icon'),
+        h('p', {class:'gs-status-team'}, tm.name),
+        h('p', {class:'gs-status-label'}, label),
+        h('p', {class:'gs-status-note'}, note),
+      ]));
+    });
+    panel.appendChild(statusGrid);
+  }
+
   return panel;
 }
 
