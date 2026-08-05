@@ -1702,10 +1702,22 @@ function setFixtureScore(t, s, side, value){
 // Menyelesaikan sebuah jadwal (fixture): menyalin skor (dari live match bila cocok),
 // menandai selesai, lalu menerapkan hasilnya ke klasemen & bagan sekali saja.
 function finalizeFixture(t, s){
-  if (s.statsApplied){ s.status='finished'; return; }
   const teamAName = (t.teams.find(function(x){return x.id===s.teamAId;})||{}).name;
   const teamBName = (t.teams.find(function(x){return x.id===s.teamBId;})||{}).name;
-  if (t.liveMatch && t.liveMatch.teamA.id===s.teamAId && t.liveMatch.teamB.id===s.teamBId){
+  // Cocokkan live match ke jadwal ini via ID tim, ATAU via nama (fallback) — supaya kalau nama
+  // tim di layar live sempat diketik manual beda dari roster, datanya tetap tersambung dengan benar.
+  const lmMatches = !!(t.liveMatch && (
+    (t.liveMatch.teamA.id===s.teamAId && t.liveMatch.teamB.id===s.teamBId) ||
+    (t.liveMatch.teamA.name===teamAName && t.liveMatch.teamB.name===teamBName)
+  ));
+  if (s.statsApplied && lmMatches){
+    // Pertandingan ini sebelumnya sudah pernah "Selesai", tapi baru saja dimainkan ulang lewat
+    // Live (mis. skor/gol direvisi) — lepas dulu statistik lama sebelum menimpa dengan yang baru,
+    // supaya klasemen tidak dobel terhitung.
+    undoMatchResultFromStandings(t, s.teamAId, s.teamBId, s.scoreA, s.scoreB);
+    s.statsApplied = false;
+  }
+  if (lmMatches){
     s.scoreA = t.liveMatch.teamA.score||0;
     s.scoreB = t.liveMatch.teamB.score||0;
     // Simpan detail pencetak gol & kartu supaya tidak hilang begitu live match ditutup —
@@ -1715,12 +1727,13 @@ function finalizeFixture(t, s){
     s.cardsA = (t.liveMatch.teamA.cards || []).slice();
     s.cardsB = (t.liveMatch.teamB.cards || []).slice();
   }
+  if (s.statsApplied){ s.status='finished'; if (lmMatches) t.liveMatch=null; return; }
   s.status = 'finished';
   applyMatchResultToStandings(t, s.teamAId, s.teamBId, s.scoreA, s.scoreB);
   if (teamAName && teamBName) syncBracketScore(t, teamAName, teamBName, Number(s.scoreA)||0, Number(s.scoreB)||0);
   syncBracketFromGroupWinners(t);
   s.statsApplied = true;
-  if (t.liveMatch && t.liveMatch.teamA.id===s.teamAId && t.liveMatch.teamB.id===s.teamBId){
+  if (lmMatches){
     t.liveMatch = null;
   }
 }
