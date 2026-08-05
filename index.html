@@ -153,7 +153,7 @@
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(244,63,94,.55);} 70%{box-shadow:0 0 0 9px rgba(244,63,94,0);} 100%{box-shadow:0 0 0 0 rgba(244,63,94,0);}}
   .live-label{color:var(--red); font-weight:700; font-size:13px; letter-spacing:.15em;}
   .pause-btn{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-2); border:1px solid var(--border); border-radius:999px; padding:5px 12px; background:none;}
-  .score-row-wrap{overflow-x:auto; position:relative;}
+  .score-row-wrap{position:relative;}
   .score-row{display:flex; align-items:center; gap:6px; min-width:0;}
   .team-block{display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 0; overflow:hidden;}
   .team-crest{height:40px; width:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#fff; flex-shrink:0;}
@@ -166,10 +166,18 @@
   .card-r{height:13px; width:9px; border-radius:2px; background:var(--red); display:inline-block;}
   .scorer-list{font-size:9.5px; color:var(--text-4); margin-top:4px; max-width:100%; overflow:hidden;}
   .scorer-list p{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .live-event-btns{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;}
   .score-center{display:flex; flex-direction:column; align-items:center; padding:0 6px; flex-shrink:0;}
   .score-nums{display:flex; align-items:center; gap:6px; font-family:'Rajdhani',sans-serif; font-size:28px; font-weight:700; color:var(--text-strong);}
   .score-sep{color:var(--text-5);}
   .clock{font-family:'JetBrains Mono',monospace; color:var(--text-3); font-size:11px; margin-top:6px; display:flex; align-items:center; gap:6px; white-space:nowrap;}
+  /* Layar sempit (HP): tumpuk Tim A / Skor / Tim B secara vertikal, bukan dipaksa sejajar,
+     supaya tombol Gol & Kartu langsung kelihatan tanpa perlu geser ke samping. */
+  @media(max-width:639px){
+    .score-row{flex-direction:column; align-items:stretch; gap:14px;}
+    .team-block{width:100%; flex:none; overflow:visible;}
+    .score-center{padding:4px 0;}
+  }
   @media(min-width:640px){
     .score-row{gap:20px; justify-content:space-between;}
     .team-block{min-width:210px; flex:initial; gap:12px; overflow:visible;}
@@ -443,6 +451,19 @@ function icon(name, size, extraClass){
   span.className = 'icon-wrap ' + extraClass;
   span.style.width = size+'px'; span.style.height = size+'px';
   span.innerHTML = '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(ICON_PATHS[name]||'')+'</svg>';
+  return span;
+}
+// Ikon dua kartu (kuning di belakang, merah di depan) buat tombol "Tambah Kartu" —
+// pakai warna asli (bukan cuma outline currentColor) supaya langsung kebaca kartunya.
+function cardsIcon(size){
+  size = size || 14;
+  const span = document.createElement('span');
+  span.className = 'icon-wrap';
+  span.style.width = size+'px'; span.style.height = size+'px';
+  span.innerHTML = '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none">'+
+    '<rect x="2" y="3" width="12" height="16" rx="2" transform="rotate(-8 8 11)" fill="#facc15" stroke="#a16207" stroke-width="1"/>'+
+    '<rect x="10" y="5" width="12" height="16" rx="2" transform="rotate(8 16 13)" fill="#ef4444" stroke="#991b1b" stroke-width="1"/>'+
+    '</svg>';
   return span;
 }
 
@@ -766,6 +787,8 @@ function buildApp(){
   if (state.showAddTournament) app.appendChild(buildAddTournamentModal());
   if (state.showImportTeams) app.appendChild(buildImportTeamsModal(t));
   if (state.showAddEvent) app.appendChild(buildAddEventModal(t));
+  if (state.showAddFixtureEvent) app.appendChild(buildAddFixtureEventModal(t));
+  if (state.showEditPlayer) app.appendChild(buildEditPlayerModal(t));
   if (state.showBracketWinner) app.appendChild(buildBracketWinnerModal(t));
   if (state.showAdminLogin) app.appendChild(buildAdminLoginModal());
 
@@ -871,6 +894,219 @@ function buildHeader(){
   header.appendChild(h('div', {class:'avatar-admin'}, 'AD'));
 
   return header;
+}
+
+/* ---------- LIST GOL / KARTU YANG BISA DIEDIT ----------
+   Dipakai baik saat pertandingan masih live maupun setelah selesai (dari halaman
+   Jadwal), supaya nama pencetak gol, menit, status penalti, dan jenis kartu bisa
+   direvisi kapan saja tanpa harus hapus-lalu-tambah-ulang. */
+function buildEventList(list, kind, onRemove){
+  return h('div', {class:'scorer-list'}, list.map(function(item, i){
+    if (!state.adminMode){
+      const label = kind==='goal'
+        ? ('⚽ ' + item.name + (item.penalty ? ' (Penalti)' : ''))
+        : ((item.type==='red'?'🟥 ':'🟨 ') + item.name);
+      return h('p', {style:{margin:'0 0 2px', display:'flex', alignItems:'center', gap:'4px'}}, [label + ' ', h('span',{class:'mono'}, item.minute+"'")]);
+    }
+    const row = h('p', {style:{margin:'0 0 4px', display:'flex', alignItems:'center', gap:'4px', flexWrap:'wrap'}});
+    if (kind === 'card'){
+      row.appendChild(h('button', {class:'icon-btn', style:{padding:'0 4px', fontSize:'11px'}, title:'Ganti jenis kartu', onclick:function(){ item.type = item.type==='red'?'yellow':'red'; render(); }}, item.type==='red'?'🟥':'🟨'));
+    } else {
+      row.appendChild(h('span', {}, '⚽'));
+    }
+    row.appendChild(editableText(function(){return item.name;}, function(v){item.name=v;}, ''));
+    if (kind === 'goal'){
+      row.appendChild(h('button', {class:'icon-btn', style:{padding:'0 4px', fontSize:'10px', opacity: item.penalty?1:0.4}, title:'Tandai/batalkan penalti', onclick:function(){ item.penalty = !item.penalty; render(); }}, 'P'));
+    }
+    row.appendChild(editableNumber(function(){return item.minute;}, function(v){item.minute=v;}, '', {min:0}));
+    row.appendChild(h('span',{class:'text-xs muted'}, "'"));
+    row.appendChild(h('button', {class:'icon-btn', style:{padding:'0', width:'14px', height:'14px'}, title:'Hapus', onclick:function(){ onRemove(i); }}, icon('x',10)));
+    return row;
+  }));
+}
+
+/* ---------- TAMBAH GOL/KARTU KE HASIL PERTANDINGAN YANG SUDAH SELESAI ----------
+   Berbeda dari buildAddEventModal (khusus pertandingan yang sedang live), modal ini
+   dipakai dari halaman Jadwal untuk merevisi/menambah catatan gol & kartu pada
+   pertandingan berstatus "Selesai" — termasuk yang dulu tidak pernah dicatat lewat
+   mode live sama sekali (misalnya skor cuma diisi manual). */
+function buildAddFixtureEventModal(t){
+  const cfg = state.showAddFixtureEvent; // {fixtureId, side:'A'|'B', type:'goal'|'card'}
+  const s = t.schedule.find(function(x){ return x.id === cfg.fixtureId; });
+  if (!s){ state.showAddFixtureEvent = null; return h('div', {}); }
+  const teamId = cfg.side === 'A' ? s.teamAId : s.teamBId;
+  const team = t.teams.find(function(x){ return x.id === teamId; });
+  const teamName = team ? team.name : (cfg.side==='A' ? 'Tim A' : 'Tim B');
+  const players = team ? team.players : [];
+  const scorersKey = cfg.side === 'A' ? 'scorersA' : 'scorersB';
+  const cardsKey = cfg.side === 'A' ? 'cardsA' : 'cardsB';
+  if (!s[scorersKey]) s[scorersKey] = [];
+  if (!s[cardsKey]) s[cardsKey] = [];
+
+  const form = { name:'', cardType:'yellow', minute:0, isPenalty:false };
+
+  const close = function(){ state.showAddFixtureEvent = null; render(); };
+  const overlay = h('div', {class:'modal-overlay', onclick:function(e){ if(e.target===overlay) close(); }});
+  const box = h('div', {class:'modal-box', style:{maxWidth:'420px'}});
+  const titleText = cfg.type==='goal' ? 'Tambah Pencetak Gol' : 'Tambah Kartu Pemain';
+  box.appendChild(h('div', {class:'modal-head'}, [h('h3',{},titleText+' — '+teamName), h('button',{class:'modal-close', onclick:close}, icon('x',20))]));
+
+  const body = h('div', {class:'flex-col gap-4'});
+  const statusMsg = h('p', {class:'text-xs', style:{color:'var(--red)', margin:0, minHeight:'14px'}});
+
+  const nameWrap = h('div', {});
+  nameWrap.appendChild(h('label',{class:'form-label'},'Nama Pemain'));
+  const customInput = h('input', {class:'form-input', placeholder:'Ketik nama pemain'});
+  customInput.addEventListener('input', function(e){ form.name = e.target.value; });
+  if (players && players.length > 0){
+    const sel = h('select', {class:'form-input'});
+    sel.appendChild(h('option',{value:''},'-- Pilih Pemain --'));
+    players.forEach(function(p){ sel.appendChild(h('option',{value:p.name}, p.name + (p.number?(' #'+p.number):''))); });
+    sel.appendChild(h('option',{value:'__custom__'},'Lainnya (ketik manual)'));
+    sel.addEventListener('change', function(e){
+      if (e.target.value === '__custom__'){ customInput.style.display = 'block'; form.name = ''; }
+      else { customInput.style.display = 'none'; form.name = e.target.value; }
+    });
+    customInput.style.display = 'none';
+    nameWrap.appendChild(sel);
+  }
+  nameWrap.appendChild(customInput);
+  body.appendChild(nameWrap);
+
+  if (cfg.type === 'card'){
+    const typeWrap = h('div', {});
+    typeWrap.appendChild(h('label',{class:'form-label'},'Jenis Kartu'));
+    const typeGrid = h('div', {class:'flex gap-2'});
+    const yBtn = h('button', {class:'btn btn-ghost-blue', style:{flex:'1'}, onclick:function(){ form.cardType='yellow'; yBtn.style.outline='2px solid var(--yellow)'; rBtn.style.outline='none'; }}, [h('span',{class:'card-y'}), ' Kuning']);
+    const rBtn = h('button', {class:'btn btn-ghost-blue', style:{flex:'1'}, onclick:function(){ form.cardType='red'; rBtn.style.outline='2px solid var(--red)'; yBtn.style.outline='none'; }}, [h('span',{class:'card-r'}), ' Merah']);
+    yBtn.style.outline = '2px solid var(--yellow)';
+    typeGrid.appendChild(yBtn); typeGrid.appendChild(rBtn);
+    typeWrap.appendChild(typeGrid);
+    body.appendChild(typeWrap);
+  }
+
+  if (cfg.type === 'goal'){
+    const penWrap = h('label', {class:'flex items-center gap-2', style:{cursor:'pointer'}});
+    const penChk = h('input', {type:'checkbox'});
+    penChk.addEventListener('change', function(e){ form.isPenalty = e.target.checked; });
+    penWrap.appendChild(penChk);
+    penWrap.appendChild(h('span', {class:'text-xs'}, 'Gol dari titik penalti'));
+    body.appendChild(penWrap);
+  }
+
+  const minuteWrap = h('div', {});
+  minuteWrap.appendChild(h('label',{class:'form-label'},'Menit'));
+  const minuteInp = h('input', {type:'number', class:'form-input', value:0, min:0, max:120});
+  minuteInp.addEventListener('input', function(e){ form.minute = parseInt(e.target.value,10); });
+  minuteWrap.appendChild(minuteInp);
+  body.appendChild(minuteWrap);
+
+  if (cfg.type === 'goal'){
+    const noteWrap = h('p', {class:'text-xs muted', style:{margin:0}}, 'Skor akan otomatis bertambah +1 untuk ' + teamName + '.');
+    body.appendChild(noteWrap);
+  }
+
+  body.appendChild(statusMsg);
+
+  body.appendChild(h('button', {class:'btn btn-primary w-full', style:{padding:'12px'}, onclick:function(){
+    const name = (form.name||'').trim();
+    if (!name){ statusMsg.textContent = 'Nama pemain wajib diisi.'; return; }
+    const minute = isNaN(form.minute) ? 0 : Math.max(0, Math.min(120, form.minute));
+    try{
+      if (cfg.type === 'goal'){
+        s[scorersKey].push({name:name, minute:minute, penalty: !!form.isPenalty});
+        const newScore = (cfg.side==='A' ? (s.scoreA||0) : (s.scoreB||0)) + 1;
+        setFixtureScore(t, s, cfg.side==='A' ? 'a' : 'b', newScore);
+        if (!t.topScorers) t.topScorers = [];
+        const existing = t.topScorers.find(function(p){ return p.name.toLowerCase()===name.toLowerCase() && p.team===teamName; });
+        if (existing) existing.goals = (existing.goals||0) + 1;
+        else t.topScorers.push({id:nextId(), name:name, team:teamName, goals:1});
+      } else {
+        s[cardsKey].push({name:name, type:form.cardType, minute:minute});
+        if (team){
+          if (!team.fairplay) team.fairplay = {yellow:0, red:0};
+          if (form.cardType==='red') team.fairplay.red = (team.fairplay.red||0)+1;
+          else team.fairplay.yellow = (team.fairplay.yellow||0)+1;
+        }
+      }
+    } catch(err){
+      console.error('Gagal menyimpan gol/kartu:', err);
+      statusMsg.textContent = 'Gagal menyimpan: ' + err.message;
+      return;
+    }
+    close();
+  }}, [icon(cfg.type==='goal'?'plus':'shield',16), cfg.type==='goal' ? 'Simpan Gol' : 'Simpan Kartu']));
+
+  box.appendChild(body);
+  overlay.appendChild(box);
+  return overlay;
+}
+
+/* ---------- EDIT PLAYER MODAL (ubah nama & nomor punggung pemain) ---------- */
+function buildEditPlayerModal(t){
+  const cfg = state.showEditPlayer; // {teamId, playerId}
+  const team = t.teams.find(function(tm){ return tm.id === cfg.teamId; });
+  const player = team ? team.players.find(function(p){ return p.id === cfg.playerId; }) : null;
+  if (!team || !player){
+    state.showEditPlayer = null;
+    return h('div', {});
+  }
+
+  const form = { name: player.name, number: player.number, position: player.position };
+
+  const close = function(){ state.showEditPlayer = null; render(); };
+  const overlay = h('div', {class:'modal-overlay', onclick:function(e){ if(e.target===overlay) close(); }});
+  const box = h('div', {class:'modal-box', style:{maxWidth:'380px'}});
+  box.appendChild(h('div', {class:'modal-head'}, [h('h3',{},'Edit Pemain — ' + team.name), h('button',{class:'modal-close', onclick:close}, icon('x',20))]));
+
+  const body = h('div', {class:'flex-col gap-4'});
+  const statusMsg = h('p', {class:'text-xs', style:{color:'var(--red)', margin:0, minHeight:'14px'}});
+
+  const nameWrap = h('div', {});
+  nameWrap.appendChild(h('label',{class:'form-label'},'Nama Pemain'));
+  const nameInp = h('input', {class:'form-input', value: form.name});
+  nameInp.addEventListener('input', function(e){ form.name = e.target.value; });
+  nameWrap.appendChild(nameInp);
+  body.appendChild(nameWrap);
+
+  const numWrap = h('div', {});
+  numWrap.appendChild(h('label',{class:'form-label'},'Nomor Punggung'));
+  const numInp = h('input', {type:'number', class:'form-input', value: form.number});
+  numInp.addEventListener('input', function(e){ form.number = parseInt(e.target.value, 10); });
+  numWrap.appendChild(numInp);
+  body.appendChild(numWrap);
+
+  const posWrap = h('div', {});
+  posWrap.appendChild(h('label',{class:'form-label'},'Posisi'));
+  const posSel = h('select', {class:'form-input'}, POSITIONS.map(function(pos){ return h('option',{value:pos, selected: form.position===pos?true:undefined}, pos); }));
+  posSel.value = form.position;
+  posSel.addEventListener('change', function(e){ form.position = e.target.value; });
+  posWrap.appendChild(posSel);
+  body.appendChild(posWrap);
+
+  body.appendChild(statusMsg);
+
+  body.appendChild(h('button', {class:'btn btn-primary w-full', style:{padding:'12px'}, onclick:function(){
+    const name = (form.name||'').trim();
+    if (!name){ statusMsg.textContent = 'Nama pemain wajib diisi.'; return; }
+    if (isNaN(form.number) || form.number < 0){ statusMsg.textContent = 'Nomor punggung tidak valid.'; return; }
+    const dup = team.players.find(function(p){ return p.id !== player.id && p.number === form.number; });
+    if (dup){ statusMsg.textContent = 'Nomor ' + form.number + ' sudah dipakai oleh ' + dup.name + '.'; return; }
+    try{
+      player.name = name;
+      player.number = form.number;
+      player.position = form.position;
+    } catch(err){
+      console.error('Gagal menyimpan perubahan pemain:', err);
+      statusMsg.textContent = 'Gagal menyimpan: ' + err.message;
+      return;
+    }
+    close();
+  }}, [icon('check',16), 'Simpan Perubahan']));
+
+  box.appendChild(body);
+  overlay.appendChild(box);
+  return overlay;
 }
 
 /* ---------- Editable primitives ---------- */
@@ -1056,23 +1292,14 @@ function buildLivePanel(t){
       h('span',{class:'card-chip'}, [h('span',{class:'card-y'}), editableNumber(function(){return team.yellow;}, function(v){team.yellow=v;}, '')]),
       h('span',{class:'card-chip'}, [h('span',{class:'card-r'}), editableNumber(function(){return team.red;}, function(v){team.red=v;}, '')]),
     ]);
-    const scorers = h('div', {class:'scorer-list'}, team.scorers.map(function(s, i){
-      return h('p', {style:{margin:'0 0 2px', display:'flex', alignItems:'center', gap:'4px'}}, [
-        '⚽ ' + s.name + (s.penalty ? ' (Penalti)' : '') + ' ', h('span',{class:'mono'}, s.minute+"'"),
-        state.adminMode ? h('button', {class:'icon-btn', style:{padding:'0', width:'14px', height:'14px'}, onclick:function(){ team.scorers.splice(i,1); if(team.score>0) team.score--; render(); }}, icon('x',10)) : null
-      ]);
-    }));
-    const cardsList = h('div', {class:'scorer-list'}, (team.cards||[]).map(function(c, i){
-      return h('p', {style:{margin:'0 0 2px', display:'flex', alignItems:'center', gap:'4px'}}, [
-        (c.type==='red'?'🟥 ':'🟨 ') + c.name + ' ', h('span',{class:'mono'}, c.minute+"'"),
-        state.adminMode ? h('button', {class:'icon-btn', style:{padding:'0', width:'14px', height:'14px'}, onclick:function(){
-          team.cards.splice(i,1); if(c.type==='red' && team.red>0) team.red--; if(c.type==='yellow' && team.yellow>0) team.yellow--; render();
-        }}, icon('x',10)) : null
-      ]);
-    }));
+    const scorers = buildEventList(team.scorers, 'goal', function(i){ team.scorers.splice(i,1); if(team.score>0) team.score--; render(); });
+    const cardsList = buildEventList(team.cards||[], 'card', function(i){
+      const c = team.cards[i];
+      team.cards.splice(i,1); if(c.type==='red' && team.red>0) team.red--; if(c.type==='yellow' && team.yellow>0) team.yellow--; render();
+    });
     const infoBlock = h('div', {style:{minWidth:0}}, [nameEl, cardRow, scorers, cardsList]);
     if (state.adminMode){
-      infoBlock.appendChild(h('div', {class:'flex gap-1', style:{marginTop:'6px'}}, [
+      infoBlock.appendChild(h('div', {class:'live-event-btns'}, [
         h('button', {class:'btn btn-ghost-blue', style:{fontSize:'10px', padding:'4px 8px'}, onclick:function(){ state.showAddEvent={side:side, type:'goal'}; render(); }}, [icon('plus',10), 'Gol']),
         h('button', {class:'btn btn-ghost-purple', style:{fontSize:'10px', padding:'4px 8px'}, onclick:function(){ state.showAddEvent={side:side, type:'card'}; render(); }}, [icon('plus',10), 'Kartu']),
       ]));
@@ -1120,7 +1347,7 @@ function ensureLiveTimer(){
 let pendingBackgroundRender = false;
 function shouldSkipAutoRender(){
   // Modal terbuka -> jangan render ulang di belakang layar (biar isian di form tidak hilang).
-  if (state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showBracketWinner || state.showAdminLogin) return true;
+  if (state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showAddFixtureEvent || state.showBracketWinner || state.showAdminLogin || state.showEditPlayer) return true;
   // Ada input/select/textarea yang sedang fokus (termasuk saat kalender/jam native browser lagi kebuka)
   // -> jangan render ulang, supaya popup-nya tidak ketutup paksa.
   const ae = document.activeElement;
@@ -1302,6 +1529,32 @@ function syncBracketScore(t, nameA, nameB, scoreA, scoreB){
     }
   }
 }
+// Tim peringkat 1 di sebuah grup (kriteria sama seperti urutan klasemen: poin, lalu selisih gol, lalu gol memasukkan).
+function groupWinner(t, groupId){
+  const teamsInGroup = t.teams.filter(function(tm){ return tm.groupId === groupId; });
+  if (teamsInGroup.length === 0) return null;
+  return teamsInGroup.slice().sort(function(a,b){ return b.stats.pts-a.stats.pts || b.stats.gd-a.stats.gd || (b.stats.gf||0)-(a.stats.gf||0); })[0];
+}
+// Isi otomatis babak pertama bagan (biasanya Semifinal) dengan nama juara tiap grup,
+// supaya langsung kelihatan siapa yang sudah lolos — dipanggil setiap hasil pertandingan
+// fase grup berubah, dan juga bisa dipicu manual dari halaman Bagan.
+function syncBracketFromGroupWinners(t){
+  if (!t.bracket || !t.groups || t.groups.length < 2) return;
+  const round0 = t.bracket.rounds[0];
+  if (!round0) return;
+  // Hanya jalan kalau jumlah grup pas dua kali jumlah pertandingan di babak pertama
+  // (mis. 4 grup -> 2 pertandingan semifinal). Kalau formatnya beda, jangan dipaksa.
+  if (t.groups.length !== round0.matches.length * 2) return;
+  for (let mi=0; mi<round0.matches.length; mi++){
+    const m = round0.matches[mi];
+    if (m.winner) continue; // pertandingan ini sudah ada hasilnya, jangan diganggu
+    const gA = t.groups[mi*2], gB = t.groups[mi*2+1];
+    const wA = gA ? groupWinner(t, gA.id) : null;
+    const wB = gB ? groupWinner(t, gB.id) : null;
+    if (wA) m.a = wA.name;
+    if (wB) m.b = wB.name;
+  }
+}
 function undoMatchResultFromStandings(t, teamAId, teamBId, scoreA, scoreB){
   const a = t.teams.find(function(x){return x.id===teamAId;});
   const b = t.teams.find(function(x){return x.id===teamBId;});
@@ -1321,6 +1574,7 @@ function setFixtureScore(t, s, side, value){
     const an = (t.teams.find(function(x){return x.id===s.teamAId;})||{}).name;
     const bn = (t.teams.find(function(x){return x.id===s.teamBId;})||{}).name;
     if (an && bn) syncBracketScore(t, an, bn, Number(s.scoreA)||0, Number(s.scoreB)||0);
+    syncBracketFromGroupWinners(t);
   }
 }
 // Menyelesaikan sebuah jadwal (fixture): menyalin skor (dari live match bila cocok),
@@ -1332,10 +1586,17 @@ function finalizeFixture(t, s){
   if (t.liveMatch && t.liveMatch.teamA.id===s.teamAId && t.liveMatch.teamB.id===s.teamBId){
     s.scoreA = t.liveMatch.teamA.score||0;
     s.scoreB = t.liveMatch.teamB.score||0;
+    // Simpan detail pencetak gol & kartu supaya tidak hilang begitu live match ditutup —
+    // biar tetap bisa direvisi nanti dari halaman Jadwal.
+    s.scorersA = (t.liveMatch.teamA.scorers || []).slice();
+    s.scorersB = (t.liveMatch.teamB.scorers || []).slice();
+    s.cardsA = (t.liveMatch.teamA.cards || []).slice();
+    s.cardsB = (t.liveMatch.teamB.cards || []).slice();
   }
   s.status = 'finished';
   applyMatchResultToStandings(t, s.teamAId, s.teamBId, s.scoreA, s.scoreB);
   if (teamAName && teamBName) syncBracketScore(t, teamAName, teamBName, Number(s.scoreA)||0, Number(s.scoreB)||0);
+  syncBracketFromGroupWinners(t);
   s.statsApplied = true;
   if (t.liveMatch && t.liveMatch.teamA.id===s.teamAId && t.liveMatch.teamB.id===s.teamBId){
     t.liveMatch = null;
@@ -1405,8 +1666,9 @@ function buildGroupStandings(t){
   const table = h('table', {}, [ h('thead',{}, h('tr',{},headCells)) ]);
   const tbody = h('tbody');
   sorted.forEach(function(tm, idx){
-    const tr = h('tr', {class: idx<2 ? 'row-top' : ''});
-    tr.appendChild(h('td', {}, h('span',{class:'rank-badge'+(idx<2?' top':'')}, String(idx+1))));
+    const isWinner = idx===0 && sorted.length>0;
+    const tr = h('tr', {class: isWinner ? 'row-top' : ''});
+    tr.appendChild(h('td', {}, h('span',{class:'rank-badge'+(isWinner?' top':'')}, isWinner ? icon('trophy',12) : String(idx+1))));
     tr.appendChild(h('td', {}, h('div',{class:'flex items-center gap-2'},[teamLogoEl(tm,26), editableText(function(){return tm.name;}, function(v){tm.name=v;}, 'font-medium')])));
     if (t.groups.length > 0){
       let groupCell;
@@ -1467,8 +1729,10 @@ function connLineV(x, yTop, height){
   return h('div', {class:'bracket-line-v', style:{left:x+'px', top:yTop+'px', height:Math.max(height,0)+'px'}});
 }
 function buildBracketPanel(t){
+  syncBracketFromGroupWinners(t); // selalu segarkan slot semifinal dari juara grup terkini tiap halaman ini dibuka
   const panel = h('div', {class:'panel panel-glow-purple'});
-  panel.appendChild(sectionTitle('network', 'Bagan Turnamen'));
+  const syncBtn = (state.adminMode && t.groups && t.groups.length>0 && t.bracket) ? h('button', {class:'btn btn-ghost-purple', onclick:function(){ syncBracketFromGroupWinners(t); render(); }}, [icon('trophy',13), 'Perbarui dari Juara Grup']) : null;
+  panel.appendChild(sectionTitle('network', 'Bagan Turnamen', syncBtn));
   if (!t.bracket){
     panel.appendChild(h('p', {class:'text-sm muted'}, 'Turnamen ini menggunakan format grup saja, tidak ada babak knockout.'));
     return panel;
@@ -1840,7 +2104,10 @@ function buildTeamsPage(t){
       }
       tr.appendChild(posCell);
       if (state.adminMode){
-        tr.appendChild(h('td', {style:{textAlign:'right'}}, h('button',{class:'icon-btn', onclick:function(){ selected.players = selected.players.filter(function(x){return x.id!==p.id;}); render(); }}, icon('trash',14))));
+        const actionsCell = h('td', {style:{textAlign:'right', whiteSpace:'nowrap'}});
+        actionsCell.appendChild(h('button',{class:'icon-btn', title:'Edit pemain', onclick:function(){ state.showEditPlayer = {teamId:selected.id, playerId:p.id}; render(); }}, icon('pencil',14)));
+        actionsCell.appendChild(h('button',{class:'icon-btn', title:'Hapus pemain', onclick:function(){ selected.players = selected.players.filter(function(x){return x.id!==p.id;}); render(); }}, icon('trash',14)));
+        tr.appendChild(actionsCell);
       }
       tbody.appendChild(tr);
     });
@@ -1856,6 +2123,8 @@ function buildTeamsPage(t){
 
 /* ---------- FIXTURES PAGE ---------- */
 let fixtureForm = { teamAId:null, teamBId:null, date:'', time:'' };
+// Menyimpan status buka/tutup panel detail gol & kartu per jadwal (tidak ikut disimpan ke data turnamen).
+let expandedFixtureDetails = {};
 function buildFixturesPage(t){
   const wrap = h('div', {class:'flex-col gap-6'});
   if (!fixtureForm.teamAId && t.teams[0]) fixtureForm.teamAId = t.teams[0].id;
@@ -1940,6 +2209,41 @@ function buildFixturesPage(t){
     }
 
     panel2.appendChild(h('div', {class:'fixture-item'}, [infoBlock, badge, actions]));
+
+    // Detail gol & kartu untuk pertandingan yang sudah selesai — bisa direvisi kapan saja.
+    // Untuk admin, tombolnya selalu muncul (bukan hanya kalau sudah ada catatan) supaya
+    // pertandingan yang skornya dulu diisi manual pun tetap bisa ditambahkan detailnya.
+    const hasExistingDetail = (s.scorersA&&s.scorersA.length) || (s.scorersB&&s.scorersB.length) || (s.cardsA&&s.cardsA.length) || (s.cardsB&&s.cardsB.length);
+    const hasDetail = s.status==='finished' && (hasExistingDetail || state.adminMode);
+    if (hasDetail){
+      const detailWrap = h('div', {style:{padding:'0 4px 10px', marginTop:'-6px'}});
+      const toggleBtn = h('button', {class:'btn btn-ghost-blue', style:{fontSize:'11px', padding:'5px 10px'}, onclick:function(){
+        expandedFixtureDetails[s.id] = !expandedFixtureDetails[s.id]; render();
+      }}, [expandedFixtureDetails[s.id] ? '▲ Sembunyikan Detail Gol & Kartu' : '▼ Lihat/Edit Detail Gol & Kartu']);
+      detailWrap.appendChild(toggleBtn);
+      if (expandedFixtureDetails[s.id]){
+        const grid = h('div', {style:{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginTop:'8px'}});
+        [{side:'A', label:teamName(s.teamAId), scorersKey:'scorersA', cardsKey:'cardsA'}, {side:'B', label:teamName(s.teamBId), scorersKey:'scorersB', cardsKey:'cardsB'}].forEach(function(sideCfg){
+          if (!s[sideCfg.scorersKey]) s[sideCfg.scorersKey] = [];
+          if (!s[sideCfg.cardsKey]) s[sideCfg.cardsKey] = [];
+          const col = h('div', {class:'fb-config-box', style:{fontFamily:'inherit'}});
+          const colHead = h('div', {class:'flex items-center justify-between', style:{marginBottom:'6px'}}, [h('p', {class:'text-xs font-semibold', style:{margin:0}}, sideCfg.label)]);
+          if (state.adminMode){
+            const btnRow = h('div', {class:'flex gap-1'});
+            btnRow.appendChild(h('button', {class:'icon-btn', title:'Tambah gol', onclick:function(){ state.showAddFixtureEvent = {fixtureId:s.id, side:sideCfg.side, type:'goal'}; render(); }}, icon('plus',12)));
+            btnRow.appendChild(h('button', {class:'icon-btn', title:'Tambah kartu', onclick:function(){ state.showAddFixtureEvent = {fixtureId:s.id, side:sideCfg.side, type:'card'}; render(); }}, cardsIcon(13)));
+            colHead.appendChild(btnRow);
+          }
+          col.appendChild(colHead);
+          col.appendChild(buildEventList(s[sideCfg.scorersKey], 'goal', function(i){ s[sideCfg.scorersKey].splice(i,1); render(); }));
+          col.appendChild(buildEventList(s[sideCfg.cardsKey], 'card', function(i){ s[sideCfg.cardsKey].splice(i,1); render(); }));
+          if (s[sideCfg.scorersKey].length===0 && s[sideCfg.cardsKey].length===0) col.appendChild(h('p',{class:'text-xs muted'},'Tidak ada catatan.'));
+          grid.appendChild(col);
+        });
+        detailWrap.appendChild(grid);
+      }
+      panel2.appendChild(detailWrap);
+    }
   });
   if (t.schedule.length===0) panel2.appendChild(h('p',{class:'text-sm muted'},'Belum ada jadwal pertandingan.'));
   wrap.appendChild(panel2);
