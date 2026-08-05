@@ -253,8 +253,7 @@
   .gs-pos-badge.silver{background:linear-gradient(135deg,#e2e8f0,#94a3b8); color:#1e293b;}
   .gs-pos-badge.bronze{background:linear-gradient(135deg,#d97706,#78350f);}
   .gs-row-winner{background:rgba(245,158,11,.08);}
-  .gs-status-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; padding:0 18px 18px;}
-  @media(min-width:640px){ .gs-status-grid{grid-template-columns:repeat(4,1fr);} }
+  .gs-status-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; padding:14px; border-top:1px solid var(--border);}
   .gs-status-card{text-align:center; padding:14px 8px; border-radius:12px; border:1px solid var(--border);}
   .gs-status-card.gold{background:rgba(245,158,11,.1); border-color:rgba(245,158,11,.35);}
   .gs-status-card.silver{background:rgba(148,163,184,.1); border-color:rgba(148,163,184,.35);}
@@ -1867,11 +1866,8 @@ function buildGroupStandings(t){
   table.appendChild(tbody);
   tableInner.appendChild(table);
   tableWrapOuter.appendChild(tableInner);
-  cols.appendChild(tableWrapOuter);
 
-  panel.appendChild(cols);
-
-  // ---- Kartu status kualifikasi tiap tim di grup ini ----
+  // ---- Kartu status kualifikasi tiap tim di grup ini — diletakkan di bawah tabel klasemen (kolom kanan), 2x2 ----
   if (sorted.length > 0){
     const nextRoundName = (t.bracket && t.bracket.rounds && t.bracket.rounds[0]) ? t.bracket.rounds[0].name : 'babak berikutnya';
     const qualifyCount = t.onlyGroupWinners ? 1 : 2;
@@ -1890,8 +1886,11 @@ function buildGroupStandings(t){
         h('p', {class:'gs-status-note'}, note),
       ]));
     });
-    panel.appendChild(statusGrid);
+    tableWrapOuter.appendChild(statusGrid);
   }
+
+  cols.appendChild(tableWrapOuter);
+  panel.appendChild(cols);
 
   return panel;
 }
