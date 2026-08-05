@@ -243,6 +243,8 @@
   .gs-match-scorers{margin-top:8px; display:grid; grid-template-columns:1fr 1fr; gap:3px 8px; font-size:9.5px; color:var(--muted);}
   .gs-match-scorers .side-a{text-align:left;}
   .gs-match-scorers .side-b{text-align:right;}
+  .gs-match-add-btns{display:flex; gap:4px; margin-top:4px;}
+  .gs-match-scorers .side-b .gs-match-add-btns{justify-content:flex-end;}
   .gs-match-empty{padding:26px 16px; text-align:center; color:var(--muted); font-size:12px;}
   .gs-table-wrap{background:var(--surface-2); border:1px solid var(--border); border-radius:14px; overflow:hidden;}
   .gs-table-inner table{width:100%; border-collapse:collapse; font-size:11px;}
@@ -1823,10 +1825,22 @@ function buildGroupStandings(t){
       ]));
       const eventsA = (s.scorersA||[]).map(function(sc){ return (sc.minute+"' ") + sc.name + (sc.penalty?' (P)':''); }).concat((s.cardsA||[]).map(function(c){ return (c.type==='red'?'🟥 ':'🟨 ') + c.name + ' ' + c.minute+"'"; }));
       const eventsB = (s.scorersB||[]).map(function(sc){ return (sc.minute+"' ") + sc.name + (sc.penalty?' (P)':''); }).concat((s.cardsB||[]).map(function(c){ return (c.type==='red'?'🟥 ':'🟨 ') + c.name + ' ' + c.minute+"'"; }));
-      if (eventsA.length || eventsB.length){
+      if (eventsA.length || eventsB.length || state.adminMode){
         const scorersWrap = h('div', {class:'gs-match-scorers'});
         const colA = h('div', {class:'side-a'}, eventsA.map(function(txt){ return h('p',{style:{margin:'0 0 2px'}}, txt); }));
         const colB = h('div', {class:'side-b'}, eventsB.map(function(txt){ return h('p',{style:{margin:'0 0 2px'}}, txt); }));
+        if (eventsA.length===0) colA.appendChild(h('p',{style:{margin:'0 0 2px', opacity:.5}}, '—'));
+        if (eventsB.length===0) colB.appendChild(h('p',{style:{margin:'0 0 2px', opacity:.5}}, '—'));
+        if (state.adminMode){
+          colA.appendChild(h('div', {class:'gs-match-add-btns'}, [
+            h('button', {class:'icon-btn', title:'Tambah gol', onclick:function(){ state.showAddFixtureEvent = {fixtureId:s.id, side:'A', type:'goal'}; render(); }}, icon('plus',11)),
+            h('button', {class:'icon-btn', title:'Tambah kartu', onclick:function(){ state.showAddFixtureEvent = {fixtureId:s.id, side:'A', type:'card'}; render(); }}, cardsIcon(11)),
+          ]));
+          colB.appendChild(h('div', {class:'gs-match-add-btns'}, [
+            h('button', {class:'icon-btn', title:'Tambah gol', onclick:function(){ state.showAddFixtureEvent = {fixtureId:s.id, side:'B', type:'goal'}; render(); }}, icon('plus',11)),
+            h('button', {class:'icon-btn', title:'Tambah kartu', onclick:function(){ state.showAddFixtureEvent = {fixtureId:s.id, side:'B', type:'card'}; render(); }}, cardsIcon(11)),
+          ]));
+        }
         scorersWrap.appendChild(colA); scorersWrap.appendChild(colB);
         card.appendChild(scorersWrap);
       }
