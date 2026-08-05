@@ -1367,18 +1367,19 @@ function buildDashboard(t){
   const grid = h('div', {class:'dash-grid'});
   const left = h('div', {class:'col-left'});
   left.appendChild(buildMatchStatsPanel(t));
-  left.appendChild(buildGroupStandings(t));
-  left.appendChild(buildBracketPanel(t)); // dipindah ke sini, tepat di bawah klasemen
+  const right = h('div', {class:'col-right'});
+  right.appendChild(buildScheduleNewsPanel(t));
+  grid.appendChild(left); grid.appendChild(right);
+  wrap.appendChild(grid);
+
+  wrap.appendChild(buildGroupStandings(t)); // full width, tidak lagi berbagi kolom
+  wrap.appendChild(buildBracketPanel(t));   // full width, tepat di bawah klasemen
+
   const twoCol = h('div', {class:'two-col'});
   twoCol.appendChild(buildPlayerStatsPanel(t));
   twoCol.appendChild(buildFairPlayPanel(t));
-  left.appendChild(twoCol);
+  wrap.appendChild(twoCol);
 
-  const right = h('div', {class:'col-right'});
-  right.appendChild(buildScheduleNewsPanel(t));
-
-  grid.appendChild(left); grid.appendChild(right);
-  wrap.appendChild(grid);
   return wrap;
 }
 
