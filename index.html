@@ -1362,18 +1362,11 @@ function buildMain(t){
 
 function buildDashboard(t){
   const wrap = h('div', {class:'flex-col gap-5'});
-  wrap.appendChild(buildLivePanel(t)); // full width, mentok kiri-kanan — tidak dibagi kolom lagi
-
-  const grid = h('div', {class:'dash-grid'});
-  const left = h('div', {class:'col-left'});
-  left.appendChild(buildMatchStatsPanel(t));
-  const right = h('div', {class:'col-right'});
-  right.appendChild(buildScheduleNewsPanel(t));
-  grid.appendChild(left); grid.appendChild(right);
-  wrap.appendChild(grid);
-
-  wrap.appendChild(buildGroupStandings(t)); // full width, tidak lagi berbagi kolom
-  wrap.appendChild(buildBracketPanel(t));   // full width, tepat di bawah klasemen
+  wrap.appendChild(buildLivePanel(t));       // full width
+  wrap.appendChild(buildMatchStatsPanel(t)); // full width
+  wrap.appendChild(buildScheduleNewsPanel(t)); // full width
+  wrap.appendChild(buildGroupStandings(t));  // full width
+  wrap.appendChild(buildBracketPanel(t));    // full width, tepat di bawah klasemen
 
   const twoCol = h('div', {class:'two-col'});
   twoCol.appendChild(buildPlayerStatsPanel(t));
@@ -2404,9 +2397,12 @@ function buildScheduleNewsPanel(t){
   const teamName = function(id){ const f=t.teams.find(function(x){return x.id===id;}); return f?f.name:'Tim Dihapus'; };
   const upcoming = t.schedule.filter(function(s){return s.status!=='finished';}).slice(0,4);
 
-  panel.appendChild(sectionTitle('calendar', 'Jadwal Mendatang'));
+  const cols = h('div', {class:'two-col'});
+
+  const schedCol = h('div', {});
+  schedCol.appendChild(sectionTitle('calendar', 'Jadwal Mendatang'));
   upcoming.forEach(function(s){
-    panel.appendChild(h('div', {class:'sched-item'}, [
+    schedCol.appendChild(h('div', {class:'sched-item'}, [
       h('div', {style:{flex:1, minWidth:0}}, [
         h('div', {class:'flex items-center gap-1 text-xs'}, [h('span',{class:'font-medium truncate'},teamName(s.teamAId)), h('span',{class:'muted'},'vs'), h('span',{class:'font-medium truncate'},teamName(s.teamBId))]),
         h('div', {class:'flex items-center gap-1 text-xs muted', style:{marginTop:'3px'}}, [s.date, '•', s.time])
@@ -2414,12 +2410,13 @@ function buildScheduleNewsPanel(t){
       h('span', {class:'status-pill ' + (s.status==='live'?'status-live':'status-upcoming')}, s.status==='live'?'LIVE':'Mendatang')
     ]));
   });
-  if (upcoming.length===0) panel.appendChild(h('p',{class:'text-xs muted'},'Belum ada jadwal mendatang.'));
+  if (upcoming.length===0) schedCol.appendChild(h('p',{class:'text-xs muted'},'Belum ada jadwal mendatang.'));
 
+  const newsCol = h('div', {});
   const addNewsBtn = state.adminMode ? h('button', {class:'icon-btn', style:{color:'#c084fc'}, onclick:function(){ t.news.unshift({id:nextId(),title:'Judul Berita Baru',excerpt:'Tuliskan ringkasan berita di sini.'}); render(); }}, icon('plus',14)) : null;
-  panel.appendChild(h('div', {style:{marginTop:'22px'}}, [sectionTitle('news','Berita Terbaru', addNewsBtn)]));
+  newsCol.appendChild(sectionTitle('news','Berita Terbaru', addNewsBtn));
   t.news.forEach(function(n, i){
-    panel.appendChild(h('div', {class:'news-item'}, [
+    newsCol.appendChild(h('div', {class:'news-item'}, [
       h('div', {class:'news-thumb'}, icon('news',16)),
       h('div', {style:{minWidth:0, flex:1}}, [
         editableText(function(){return n.title;}, function(v){n.title=v;}, 'font-medium', ),
@@ -2429,8 +2426,10 @@ function buildScheduleNewsPanel(t){
       state.adminMode ? h('button', {class:'icon-btn', onclick:function(){ t.news.splice(i,1); render(); }}, icon('x',13)) : null
     ]));
   });
-  if (t.news.length===0) panel.appendChild(h('p',{class:'text-xs muted'},'Belum ada berita.'));
+  if (t.news.length===0) newsCol.appendChild(h('p',{class:'text-xs muted'},'Belum ada berita.'));
 
+  cols.appendChild(schedCol); cols.appendChild(newsCol);
+  panel.appendChild(cols);
   return panel;
 }
 
