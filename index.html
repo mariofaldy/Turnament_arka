@@ -306,27 +306,54 @@
   .bracket-round:last-child{margin-bottom:0;}
   .bracket-round-name{font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:8px; display:flex; align-items:center; gap:6px;}
   .bracket-matches{display:grid; grid-template-columns:1fr; gap:8px;}
-  .bracket-match{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;}
-  .bracket-team-row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
-  .bracket-winner-row{color:var(--acc-amber-text);}
-  .bracket-winner-row .bracket-team-name{color:var(--acc-amber-text); font-weight:700;}
-  .bracket-team-name{font-size:12px; font-weight:500; color:var(--text-heading);}
-  .bracket-note{font-size:9.5px; color:var(--text-4);}
+  .bracket-note{font-size:9.5px; color:rgba(255,255,255,.5);}
 
-  /* bagan bertingkat (tree bracket) */
-  .bracket-tree-scroll{overflow-x:auto; overflow-y:hidden; padding-bottom:10px;}
-  .bracket-tree-header{display:flex;}
-  .bracket-tree-header .col-label{flex-shrink:0; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); display:flex; align-items:center; gap:6px; padding-bottom:14px;}
+  /* ---- Bagan Turnamen: poster ungu bergaya "bagan sepak bola" ---- */
+  .bracket-poster{position:relative; overflow:hidden; padding:0; border:none; box-shadow:none;}
+  .bracket-poster-inner{position:relative; overflow:hidden; border-radius:18px; padding:24px 18px 20px; background:linear-gradient(150deg,#2a1454 0%,#3d1a6b 45%,#1f0f3d 100%);}
+  .bp-glow-a{position:absolute; top:-70px; left:-50px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle, rgba(245,158,11,.28), transparent 70%); filter:blur(10px); pointer-events:none;}
+  .bp-glow-b{position:absolute; bottom:-70px; right:-50px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle, rgba(168,85,247,.35), transparent 70%); filter:blur(10px); pointer-events:none;}
+  .bp-corner{position:absolute; width:140px; height:140px; background:rgba(255,255,255,.03); pointer-events:none;}
+  .bp-corner.tl{top:0; left:0; clip-path:polygon(0 0, 100% 0, 0 100%);}
+  .bp-corner.br{bottom:0; right:0; clip-path:polygon(100% 100%, 0 100%, 100% 0);}
+  .bracket-poster-head{position:relative; text-align:center; margin-bottom:18px;}
+  .bracket-poster-eyebrow{font-size:10px; letter-spacing:.28em; color:rgba(255,255,255,.55); font-weight:700; text-transform:uppercase; margin:0 0 4px;}
+  .bracket-poster-title{font-family:'Rajdhani',sans-serif; font-size:19px; font-weight:800; color:#fff; margin:0; word-break:break-word;}
+  .bracket-poster-round-badge{display:inline-flex; align-items:center; gap:6px; margin-top:11px; padding:5px 16px; background:rgba(245,158,11,.16); border:1px solid rgba(245,158,11,.4); border-radius:999px; font-size:10.5px; font-weight:800; letter-spacing:.12em; color:var(--acc-amber-text); text-transform:uppercase;}
+  .bracket-tree-scroll{overflow-x:auto; overflow-y:hidden; padding-bottom:10px; position:relative;}
+  .bracket-tree-header{display:flex; position:relative;}
+  .bracket-tree-header .col-label{flex-shrink:0; font-size:11px; text-transform:uppercase; letter-spacing:.05em; display:flex; align-items:center; gap:6px; padding-bottom:14px; color:rgba(255,255,255,.55);}
   .bracket-tree{position:relative;}
-  .bracket-tree .bracket-match{position:absolute; margin:0;}
-  .bracket-tree .bracket-match:hover{border-color:rgba(245,158,11,.4);}
-  .bracket-line-h{position:absolute; height:2px; background:linear-gradient(90deg, rgba(180,255,205,.28), rgba(245,158,11,.28)); margin-top:-1px;}
-  .bracket-line-v{position:absolute; width:2px; background:rgba(180,255,205,.22); margin-left:-1px;}
   .bracket-champion-col{flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;}
-  .bracket-champion-card{background:linear-gradient(160deg, rgba(245,158,11,.22), rgba(34,197,94,.1)); border:1.5px solid rgba(245,158,11,.5); border-radius:14px; padding:16px 18px; display:flex; flex-direction:column; align-items:center; gap:6px; box-shadow:0 20px 50px -20px rgba(245,158,11,.5); min-width:150px;}
+  .bracket-match{position:relative; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:9px; display:flex; flex-direction:column; gap:5px; backdrop-filter:blur(6px);}
+  .bracket-tree .bracket-match{position:absolute; margin:0;}
+  .bracket-tree .bracket-match:hover{border-color:rgba(245,158,11,.55);}
+  .bracket-team-row{display:flex; align-items:center; gap:7px; padding:6px 8px; border-radius:8px; background:rgba(255,255,255,.92);}
+  .bracket-team-crest{height:20px; width:20px; border-radius:50%; flex-shrink:0; object-fit:cover;}
+  .bracket-team-crest-fallback{height:20px; width:20px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:10px; color:#fff; font-weight:700;}
+  .bracket-team-name{font-size:11.5px; font-weight:700; color:#211a3a; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .bracket-team-row .inline-edit-num{background:rgba(0,0,0,.06); border-color:rgba(0,0,0,.15); color:#211a3a; width:28px; flex-shrink:0;}
+  .bracket-winner-row{background:linear-gradient(135deg,#fde68a,#f59e0b); box-shadow:0 4px 14px -4px rgba(245,158,11,.6);}
+  .bracket-winner-row .bracket-team-name{color:#3a2405;}
+  .bracket-line-h{position:absolute; height:2px; background:linear-gradient(90deg, rgba(245,158,11,.55), rgba(245,158,11,.25)); margin-top:-1px;}
+  .bracket-line-v{position:absolute; width:2px; background:rgba(245,158,11,.4); margin-left:-1px;}
+  .bracket-champion-card{background:linear-gradient(160deg, rgba(245,158,11,.28), rgba(124,58,237,.18)); border:1.5px solid rgba(245,158,11,.55); border-radius:14px; padding:16px 18px; display:flex; flex-direction:column; align-items:center; gap:6px; box-shadow:0 20px 50px -20px rgba(245,158,11,.5); min-width:150px; color:#fff;}
   .bracket-champion-card .cc-label{font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--acc-amber-text);}
   .bracket-champion-card .cc-name{font-size:15px; font-weight:700; color:#fff; text-align:center;}
-  .bracket-champion-card.pending{opacity:.45; border-style:dashed;}
+  .bracket-champion-card.pending{opacity:.5; border-style:dashed;}
+
+  /* ---- Bagan V (2 semifinal -> final), niru poster referensi ---- */
+  .bp-v-wrap{display:flex; align-items:center; justify-content:center; position:relative; padding:8px 0 4px; gap:0;}
+  .bp-v-side{position:relative; flex-shrink:0;}
+  .bp-v-team-box{position:relative; z-index:2; background:rgba(255,255,255,.94); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:8px;}
+  .bp-v-team-box.winner{background:linear-gradient(135deg,#fde68a,#f59e0b); box-shadow:0 4px 14px -4px rgba(245,158,11,.6);}
+  .bp-v-team-box .bp-v-name{font-weight:700; font-size:12.5px; color:#211a3a; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .bp-v-mid-label{position:absolute; z-index:2; left:50%; transform:translate(-50%,-50%); font-size:9.5px; color:rgba(255,255,255,.55); white-space:nowrap; background:linear-gradient(150deg,#2a1454,#3d1a6b); padding:2px 6px;}
+  .bp-v-btn-wrap{position:absolute; z-index:2; left:50%; transform:translateX(-50%); white-space:nowrap;}
+  .bp-v-center{flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:0 14px; position:relative; z-index:2;}
+  .bp-v-center-label{font-family:'Rajdhani',sans-serif; font-weight:800; font-size:17px; color:#fff; letter-spacing:.06em; margin-top:2px;}
+  .bp-v-center-sub{font-size:9.5px; color:rgba(255,255,255,.55); text-align:center; max-width:130px;}
+  .bp-v-center-score{margin-top:2px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.22); border-radius:8px; padding:5px 14px; font-weight:800; color:#fff; font-size:13px; font-family:'Rajdhani',sans-serif;}
 
   /* players */
   .player-list{display:flex; flex-direction:column; gap:12px;}
@@ -1960,12 +1987,19 @@ function buildGroupStandings(t){
 /* ---------- BRACKET ---------- */
 function bracketMatchEl(t, ri, mi, match){
   const isFinalRound = ri === t.bracket.rounds.length - 1;
+  function crestFor(name){
+    const team = t.teams.find(function(tm){ return tm.name===name; });
+    if (team && team.logoUrl) return h('img', {class:'bracket-team-crest', src:team.logoUrl});
+    return h('div', {class:'bracket-team-crest-fallback', style:{background: team ? (GRAD_CSS[team.color]||GRAD_CSS['grad-blue']) : '#94a3b8'}}, (team&&team.emoji)||'⚽');
+  }
   const row1 = h('div', {class:'bracket-team-row' + (match.winner==='a' ? ' bracket-winner-row' : '')}, [
-    h('span', {class:'flex items-center gap-1'}, [match.winner==='a' ? icon('trophy',11) : null, editableText(function(){return match.a;}, function(v){match.a=v;}, 'bracket-team-name')]),
+    match.a!=='TBD' ? crestFor(match.a) : null,
+    h('span', {class:'flex items-center gap-1', style:{minWidth:0, flex:'1'}}, [match.winner==='a' ? icon('trophy',11) : null, editableText(function(){return match.a;}, function(v){match.a=v;}, 'bracket-team-name')]),
     editableNumber(function(){return match.scoreA;}, function(v){match.scoreA=v;}, 'font-bold')
   ]);
   const row2 = h('div', {class:'bracket-team-row' + (match.winner==='b' ? ' bracket-winner-row' : '')}, [
-    h('span', {class:'flex items-center gap-1'}, [match.winner==='b' ? icon('trophy',11) : null, editableText(function(){return match.b;}, function(v){match.b=v;}, 'bracket-team-name')]),
+    match.b!=='TBD' ? crestFor(match.b) : null,
+    h('span', {class:'flex items-center gap-1', style:{minWidth:0, flex:'1'}}, [match.winner==='b' ? icon('trophy',11) : null, editableText(function(){return match.b;}, function(v){match.b=v;}, 'bracket-team-name')]),
     editableNumber(function(){return match.scoreB;}, function(v){match.scoreB=v;}, 'font-bold')
   ]);
   const el = h('div', {class:'bracket-match'}, [row1, row2]);
@@ -1983,16 +2017,131 @@ function connLineH(x, y, width){
 function connLineV(x, yTop, height){
   return h('div', {class:'bracket-line-v', style:{left:x+'px', top:yTop+'px', height:Math.max(height,0)+'px'}});
 }
+
+function bpVTeamBox(t, match, isA){
+  const name = isA ? match.a : match.b;
+  const isWinner = match.winner === (isA ? 'a' : 'b');
+  const team = t.teams.find(function(tm){ return tm.name===name; });
+  const crest = name!=='TBD' ? (team && team.logoUrl ? h('img',{class:'bracket-team-crest', src:team.logoUrl}) : h('div', {class:'bracket-team-crest-fallback', style:{background: team ? (GRAD_CSS[team.color]||GRAD_CSS['grad-blue']) : '#94a3b8'}}, (team&&team.emoji)||'⚽')) : null;
+  return h('div', {class:'bp-v-team-box' + (isWinner?' winner':'')}, [
+    crest,
+    isWinner ? icon('trophy',11) : null,
+    h('span', {class:'bp-v-name'}, name),
+    editableNumber(function(){return isA?match.scoreA:match.scoreB;}, function(v){ if(isA) match.scoreA=v; else match.scoreB=v; }, 'font-bold')
+  ]);
+}
+
+// Layout khusus 2 semifinal -> final, bentuk "V" ketemu di tengah — niru poster bagan referensi.
+function buildBracketPosterVShape(t, panel, rounds){
+  const sfMatches = rounds[0].matches;
+  const finalMatch = rounds[1].matches[0];
+  const BOX_H = 46, GAP_BETWEEN = 64, GAP_W = 34, SIDE_W = 200, CENTER_W = 150;
+  const totalH = BOX_H*2 + GAP_BETWEEN;
+  const y1 = BOX_H/2, y2 = BOX_H + GAP_BETWEEN + BOX_H/2, yMid = totalH/2;
+
+  function statusLabel(m){
+    if (m.a==='TBD' || m.b==='TBD') return 'Menunggu Tim';
+    if (m.winner) return (m.winner==='a'?m.a:m.b) + ' Menang';
+    return 'Menunggu Hasil';
+  }
+
+  function sideEl(match, mirrored){
+    const side = h('div', {class:'bp-v-side', style:{width:SIDE_W+'px', height:totalH+'px'}});
+    const boxA = bpVTeamBox(t, match, true); Object.assign(boxA.style, {position:'absolute', top:(y1-BOX_H/2)+'px', left:'0', width:SIDE_W+'px'});
+    const boxB = bpVTeamBox(t, match, false); Object.assign(boxB.style, {position:'absolute', top:(y2-BOX_H/2)+'px', left:'0', width:SIDE_W+'px'});
+    side.appendChild(boxA); side.appendChild(boxB);
+    // garis penghubung: dua horizontal dari tiap box -> ketemu vertikal -> satu horizontal ke tengah
+    const edgeX = mirrored ? SIDE_W : 0; // sisi kanan bagan: box ada di kanan wrap, garis keluar ke kiri (x=0); sisi kiri: garis keluar ke kanan (x=SIDE_W)
+    const xMid = mirrored ? SIDE_W - GAP_W/2 : SIDE_W + GAP_W/2;
+    if (!mirrored){
+      side.appendChild(connLineH(edgeX, y1, GAP_W/2));
+      side.appendChild(connLineH(edgeX, y2, GAP_W/2));
+      side.appendChild(connLineV(xMid, Math.min(y1,y2), Math.abs(y2-y1)));
+      side.appendChild(connLineH(xMid, yMid, GAP_W/2));
+    }
+    side.appendChild(h('div', {class:'bp-v-mid-label', style:{top:yMid+'px'}}, statusLabel(match)));
+    if (state.adminMode && match.a!=='TBD' && match.b!=='TBD'){
+      side.appendChild(h('div', {class:'bp-v-btn-wrap', style:{top:(yMid+16)+'px'}}, [
+        h('button', {class:'btn btn-ghost-purple', style:{fontSize:'9.5px', padding:'3px 8px'}, onclick:function(){
+          const ri = 0, mi = sfMatches.indexOf(match);
+          state.showBracketWinner = {ri:ri, mi:mi}; render();
+        }}, match.winner ? 'Ubah Pemenang' : 'Tentukan Pemenang')
+      ]));
+    }
+    return side;
+  }
+
+  const leftSide = sideEl(sfMatches[0], false);
+  const rightSideInner = h('div', {class:'bp-v-side', style:{width:SIDE_W+'px', height:totalH+'px'}});
+  // sisi kanan: box digeser ke kanan (setelah garis), garis keluar dari kiri box menuju tengah
+  const rBoxA = bpVTeamBox(t, sfMatches[1], true); Object.assign(rBoxA.style, {position:'absolute', top:(y1-BOX_H/2)+'px', left:GAP_W+'px', width:SIDE_W+'px'});
+  const rBoxB = bpVTeamBox(t, sfMatches[1], false); Object.assign(rBoxB.style, {position:'absolute', top:(y2-BOX_H/2)+'px', left:GAP_W+'px', width:SIDE_W+'px'});
+  rightSideInner.appendChild(rBoxA); rightSideInner.appendChild(rBoxB);
+  rightSideInner.style.width = (SIDE_W+GAP_W)+'px';
+  const xMidR = GAP_W/2;
+  rightSideInner.appendChild(connLineH(0, yMid, GAP_W/2));
+  rightSideInner.appendChild(connLineV(xMidR, Math.min(y1,y2), Math.abs(y2-y1)));
+  rightSideInner.appendChild(connLineH(xMidR, y1, GAP_W/2));
+  rightSideInner.appendChild(connLineH(xMidR, y2, GAP_W/2));
+  rightSideInner.appendChild(h('div', {class:'bp-v-mid-label', style:{top:yMid+'px', left:(GAP_W+8)+'px', transform:'translate(0,-50%)'}}, statusLabel(sfMatches[1])));
+  if (state.adminMode && sfMatches[1].a!=='TBD' && sfMatches[1].b!=='TBD'){
+    rightSideInner.appendChild(h('div', {class:'bp-v-btn-wrap', style:{top:(yMid+16)+'px', left:(GAP_W+8+70)+'px'}}, [
+      h('button', {class:'btn btn-ghost-purple', style:{fontSize:'9.5px', padding:'3px 8px'}, onclick:function(){
+        state.showBracketWinner = {ri:0, mi:1}; render();
+      }}, sfMatches[1].winner ? 'Ubah Pemenang' : 'Tentukan Pemenang')
+    ]));
+  }
+
+  const finalDone = finalMatch.a!=='TBD' && finalMatch.b!=='TBD';
+  const championName = finalMatch.winner ? (finalMatch.winner==='a'?finalMatch.a:finalMatch.b) : null;
+  const centerCol = h('div', {class:'bp-v-center', style:{height:totalH+'px'}}, [
+    icon('trophy', 30, 'gs-hero-trophy'),
+    h('div', {class:'bp-v-center-label'}, rounds[1].name.toUpperCase()),
+    h('div', {class:'bp-v-center-sub'}, finalDone ? (finalMatch.a+' vs '+finalMatch.b) : 'Menunggu Semifinalis'),
+    finalDone ? h('div', {class:'bp-v-center-score'}, finalMatch.scoreA+' - '+finalMatch.scoreB) : null,
+    championName ? h('div', {class:'bp-v-center-sub', style:{color:'var(--acc-amber-text)', fontWeight:'700', marginTop:'2px'}}, '🏆 '+championName) : null,
+    (state.adminMode && finalDone) ? h('button', {class:'btn btn-ghost-purple', style:{fontSize:'9.5px', padding:'3px 8px', marginTop:'4px'}, onclick:function(){
+      state.showBracketWinner = {ri:1, mi:0}; render();
+    }}, finalMatch.winner ? 'Ubah Juara' : 'Tentukan Juara') : null,
+  ]);
+
+  const wrap = h('div', {class:'bp-v-wrap'}, [leftSide, centerCol, rightSideInner]);
+  panel.appendChild(h('div', {class:'bracket-tree-scroll scrollbar'}, [wrap]));
+}
+
 function buildBracketPanel(t){
   syncBracketFromGroupWinners(t); // selalu segarkan slot semifinal dari juara grup terkini tiap halaman ini dibuka
-  const panel = h('div', {class:'panel panel-glow-purple'});
-  const syncBtn = (state.adminMode && t.groups && t.groups.length>0 && t.bracket) ? h('button', {class:'btn btn-ghost-purple', onclick:function(){ syncBracketFromGroupWinners(t); render(); }}, [icon('trophy',13), 'Perbarui dari Juara Grup']) : null;
-  panel.appendChild(sectionTitle('network', 'Bagan Turnamen', syncBtn));
+  const outerPanel = h('div', {class:'panel bracket-poster'});
+  const panel = h('div', {class:'bracket-poster-inner'});
+  outerPanel.appendChild(panel);
+  panel.appendChild(h('div', {class:'bp-glow-a'}));
+  panel.appendChild(h('div', {class:'bp-glow-b'}));
+  panel.appendChild(h('div', {class:'bp-corner tl'}));
+  panel.appendChild(h('div', {class:'bp-corner br'}));
+
+  const syncBtn = (state.adminMode && t.groups && t.groups.length>0 && t.bracket) ? h('button', {class:'btn btn-ghost-purple', style:{position:'relative'}, onclick:function(){ syncBracketFromGroupWinners(t); render(); }}, [icon('trophy',13), 'Perbarui dari Juara Grup']) : null;
+
   if (!t.bracket){
-    panel.appendChild(h('p', {class:'text-sm muted'}, 'Turnamen ini menggunakan format grup saja, tidak ada babak knockout.'));
-    return panel;
+    panel.appendChild(h('div', {class:'bracket-poster-head'}, [
+      h('p', {class:'bracket-poster-eyebrow'}, 'BAGAN TURNAMEN'),
+      h('h2', {class:'bracket-poster-title'}, t.name.toUpperCase()),
+    ]));
+    panel.appendChild(h('p', {class:'text-sm', style:{color:'rgba(255,255,255,.6)', position:'relative', textAlign:'center'}}, 'Turnamen ini menggunakan format grup saja, tidak ada babak knockout.'));
+    return outerPanel;
   }
   const rounds = t.bracket.rounds;
+
+  panel.appendChild(h('div', {class:'bracket-poster-head'}, [
+    h('p', {class:'bracket-poster-eyebrow'}, 'BAGAN TURNAMEN'),
+    h('h2', {class:'bracket-poster-title'}, t.name.toUpperCase()),
+    h('div', {class:'bracket-poster-round-badge'}, [icon('trophy',11), rounds[0].name]),
+    syncBtn ? h('div', {style:{marginTop:'12px'}}, syncBtn) : null,
+  ]));
+
+  if (rounds.length===2 && rounds[0].matches.length===2 && rounds[1].matches.length===1){
+    buildBracketPosterVShape(t, panel, rounds);
+    return outerPanel;
+  }
 
   const COL_W = 208;      // lebar kartu pertandingan
   const GAP_W = 48;       // jarak horizontal antar ronde (tempat garis penghubung)
@@ -2061,7 +2210,7 @@ function buildBracketPanel(t){
   scrollWrap.appendChild(header);
   scrollWrap.appendChild(innerRow);
   panel.appendChild(scrollWrap);
-  return panel;
+  return outerPanel;
 }
 
 
