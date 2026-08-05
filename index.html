@@ -518,6 +518,7 @@ const ICON_PATHS = {
   moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
   download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  refresh:'<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>',
 };
 function icon(name, size, extraClass){
   size = size || 16; extraClass = extraClass || '';
@@ -1379,6 +1380,14 @@ function buildLivePanel(t){
     h('div', {class:'flex items-center gap-2'}, [h('span',{class:'live-dot'}), h('span',{class:'live-label'},'LIVE')]),
     h('div', {class:'flex items-center gap-2'}, [
       h('button', {class:'pause-btn', onclick:function(){ state.liveRunning=!state.liveRunning; render(); }}, [icon(state.liveRunning?'pause':'play',12), state.liveRunning?'Jeda':'Lanjut']),
+      state.adminMode ? h('button', {class:'btn btn-ghost-purple', style:{fontSize:'11px', padding:'6px 10px'}, onclick:function(){
+        if (!confirm('Reset pertandingan ini? Waktu kembali ke 00:00, skor, gol, dan kartu juga ikut kembali ke 0. Aksi ini tidak bisa dibatalkan.')) return;
+        t.liveMatch.minute = 0; t.liveMatch.second = 0;
+        t.liveMatch.teamA.score = 0; t.liveMatch.teamA.yellow = 0; t.liveMatch.teamA.red = 0; t.liveMatch.teamA.scorers = []; t.liveMatch.teamA.cards = [];
+        t.liveMatch.teamB.score = 0; t.liveMatch.teamB.yellow = 0; t.liveMatch.teamB.red = 0; t.liveMatch.teamB.scorers = []; t.liveMatch.teamB.cards = [];
+        state.liveRunning = false;
+        render();
+      }}, [icon('refresh',12), 'Reset']) : null,
       state.adminMode ? h('button', {class:'btn btn-ghost-green', style:{fontSize:'11px', padding:'6px 10px'}, onclick:function(){
         finalizeLiveMatch(t); state.liveRunning=false; render();
       }}, [icon('check',12), 'Selesai Pertandingan']) : null
