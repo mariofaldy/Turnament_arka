@@ -2345,6 +2345,27 @@ function buildAdminLoginModal(){
   return overlay;
 }
 
+// Hitung ulang Best Goalkeepers dari histori pertandingan yang sudah selesai, berdasarkan
+// siapa yang SEKARANG ditandai posisi "GK" di tiap tim. Berguna kalau posisi kiper baru
+// ditandai belakangan (setelah beberapa pertandingan sudah berjalan) — pertandingan lama
+// yang clean sheet-nya belum sempat kehitung otomatis jadi ikut terhitung.
+function recalculateBestGK(t){
+  const cleanSheetCount = {}; // teamId -> jumlah clean sheet
+  t.schedule.forEach(function(s){
+    if (s.status !== 'finished') return;
+    if (Number(s.scoreB)===0) cleanSheetCount[s.teamAId] = (cleanSheetCount[s.teamAId]||0)+1;
+    if (Number(s.scoreA)===0) cleanSheetCount[s.teamBId] = (cleanSheetCount[s.teamBId]||0)+1;
+  });
+  const newList = [];
+  t.teams.forEach(function(team){
+    const gk = team.players.find(function(p){return p.position==='GK';});
+    if (!gk) return;
+    const cs = cleanSheetCount[team.id] || 0;
+    if (cs > 0) newList.push({id:nextId(), name:gk.name, team:team.name, cleanSheets:cs});
+  });
+  t.bestGK = newList;
+}
+
 function buildPlayerStatsPanel(t){
   const panel = h('div', {class:'panel'});
   const addScorerBtn = state.adminMode ? h('button', {class:'icon-btn', style:{color:'#60a5fa'}, onclick:function(){ t.topScorers.push({id:nextId(),name:'Pemain Baru',team:'Tim',goals:0}); render(); }}, icon('plus',14)) : null;
@@ -2372,8 +2393,11 @@ function buildPlayerStatsPanel(t){
   colA.appendChild(listA);
 
   const addGkBtn = state.adminMode ? h('button', {class:'icon-btn', style:{color:'#c084fc'}, onclick:function(){ t.bestGK.push({id:nextId(),name:'Kiper Baru',team:'Tim',cleanSheets:0}); render(); }}, icon('plus',14)) : null;
+  const recalcGkBtn = state.adminMode ? h('button', {class:'icon-btn', title:'Hitung ulang dari hasil pertandingan (pakai posisi kiper terkini)', onclick:function(){
+    recalculateBestGK(t); render();
+  }}, icon('refresh',13)) : null;
   const colB = h('div');
-  colB.appendChild(h('div', {class:'flex items-center justify-between mb-3'}, [h('p',{class:'text-xs muted uppercase'},'Best Goalkeepers'), addGkBtn]));
+  colB.appendChild(h('div', {class:'flex items-center justify-between mb-3'}, [h('p',{class:'text-xs muted uppercase'},'Best Goalkeepers'), h('div',{class:'flex gap-1'},[recalcGkBtn, addGkBtn])]));
   const listB = h('div', {class:'player-list'});
   t.bestGK.slice().sort(function(a,b){ return (b.cleanSheets||0)-(a.cleanSheets||0); }).forEach(function(p){
     const i = t.bestGK.indexOf(p);
