@@ -153,34 +153,68 @@
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(244,63,94,.55);} 70%{box-shadow:0 0 0 9px rgba(244,63,94,0);} 100%{box-shadow:0 0 0 0 rgba(244,63,94,0);}}
   .live-label{color:var(--red); font-weight:700; font-size:13px; letter-spacing:.15em;}
   .pause-btn{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-2); border:1px solid var(--border); border-radius:999px; padding:5px 12px; background:none;}
-  .score-row-wrap{position:relative;}
-  /* Tim A / Skor / Tim B selalu ditumpuk vertikal (bukan sejajar horizontal) — pada layar
-     lebar pun panel Live Score ini bisa jadi sempit karena berbagi tempat dengan panel lain
-     (mis. Bagan Turnamen) di layout dua kolom, jadi jangan andalkan lebar viewport saja. */
-  .score-row{display:flex; flex-direction:column; align-items:stretch; gap:14px; min-width:0;}
-  .team-block{display:flex; align-items:center; gap:8px; min-width:0; width:100%; overflow:visible;}
-  .team-crest{height:40px; width:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#fff; flex-shrink:0;}
-  .team-crest.a{background:linear-gradient(135deg,var(--blue),#15803d); box-shadow:0 10px 25px -8px rgba(34,197,94,.4);}
-  .team-crest.b{background:linear-gradient(135deg,var(--purple),#b45309); box-shadow:0 10px 25px -8px rgba(245,158,11,.4);}
-  .team-info-name{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:14px; color:var(--text-heading); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; display:block;}
-  .card-row{display:flex; align-items:center; gap:6px; font-size:10px; color:var(--text-3); margin-top:4px; flex-wrap:wrap;}
+  /* Dipakai di banyak tempat: klasemen fair play, tombol pilih jenis kartu di modal, dll */
   .card-chip{display:flex; align-items:center; gap:4px;}
-  .card-y{height:13px; width:9px; border-radius:2px; background:var(--yellow); display:inline-block;}
-  .card-r{height:13px; width:9px; border-radius:2px; background:var(--red); display:inline-block;}
-  .scorer-list{font-size:9.5px; color:var(--text-4); margin-top:4px; max-width:100%; overflow:hidden;}
+  .card-y{height:13px; width:9px; border-radius:2px; background:var(--yellow); display:inline-block; flex-shrink:0;}
+  .card-r{height:13px; width:9px; border-radius:2px; background:var(--red); display:inline-block; flex-shrink:0;}
+
+  /* Dipakai oleh buildEventList() di halaman Jadwal (detail gol/kartu pertandingan selesai) */
+  .scorer-list{font-size:11px; color:var(--text-4); margin-top:4px; max-width:100%; overflow:hidden;}
   .scorer-list p{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .live-event-btns{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;}
-  .score-center{display:flex; flex-direction:column; align-items:center; padding:4px 0; flex-shrink:0;}
-  .score-nums{display:flex; align-items:center; gap:6px; font-family:'Rajdhani',sans-serif; font-size:28px; font-weight:700; color:var(--text-strong);}
-  .score-sep{color:var(--text-5);}
-  .clock{font-family:'JetBrains Mono',monospace; color:var(--text-3); font-size:11px; margin-top:6px; display:flex; align-items:center; gap:6px; white-space:nowrap;}
-  @media(min-width:640px){
-    .team-crest{height:48px; width:48px; font-size:16px;}
-    .team-info-name{font-size:16px;}
-    .card-row{font-size:11px; gap:10px;}
-    .scorer-list{font-size:10.5px;}
-    .score-nums{font-size:36px; gap:10px;}
-    .clock{font-size:13px; margin-top:8px;}
+
+  /* Dipakai untuk logo/emoji turnamen di sidebar (ukuran & bentuknya di-override inline) */
+  .team-crest{display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; flex-shrink:0;}
+
+  /* ---- Live Scoreboard (kartu skor gaya "match center") ---- */
+  .live-scoreboard{position:relative; overflow:hidden; border-radius:18px; padding:22px 16px 18px;
+    background:linear-gradient(160deg,#171933 0%,#1f1b42 45%,#2c1a40 100%);}
+  .ls-glow{position:absolute; border-radius:50%; filter:blur(60px); pointer-events:none; opacity:.5;}
+  .ls-glow-a{top:-60px; left:-40px; height:180px; width:180px; background:var(--blue);}
+  .ls-glow-b{bottom:-60px; right:-40px; height:180px; width:180px; background:var(--purple);}
+  .ls-meta{position:relative; text-align:center; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.5); margin-bottom:14px;}
+  .ls-main{position:relative; display:flex; align-items:flex-start; justify-content:center; gap:10px;}
+  .ls-team{display:flex; flex-direction:column; align-items:center; width:84px; min-width:0; flex-shrink:0;}
+  .ls-crest{height:44px; width:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.14), 0 8px 20px -6px rgba(0,0,0,.5); flex-shrink:0;}
+  .ls-crest.a{background:linear-gradient(135deg,var(--blue),#15803d);}
+  .ls-crest.b{background:linear-gradient(135deg,var(--purple),#b45309);}
+  .ls-crest img{height:100%; width:100%; border-radius:50%; object-fit:cover;}
+  .ls-team-name{margin-top:8px; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:12.5px; color:#fff; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;}
+  .ls-team-name input.inline-edit{color:#fff; text-align:center; font-size:12.5px;}
+  .ls-cards{display:flex; align-items:center; justify-content:center; gap:6px; margin-top:5px; font-size:9.5px;}
+  .ls-score{display:flex; flex-direction:column; align-items:center; padding:0 6px; flex-shrink:0;}
+  .ls-score-nums{display:flex; align-items:center; gap:8px; font-family:'Rajdhani',sans-serif; font-size:34px; font-weight:700; color:#fff; line-height:1;}
+  .ls-score-nums input.inline-edit-num{color:#fff; background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.25); font-size:inherit; width:1.3em;}
+  .ls-score-sep{color:rgba(255,255,255,.35);}
+  .ls-clock{margin-top:9px; display:flex; align-items:center; gap:5px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--acc-amber-text); background:rgba(245,158,11,.16); border:1px solid rgba(245,158,11,.3); border-radius:999px; padding:4px 10px; white-space:nowrap;}
+  .ls-half{margin-top:4px; font-size:9.5px; color:rgba(255,255,255,.45);}
+  .ls-divider{position:relative; height:1px; background:rgba(255,255,255,.1); margin:16px 0 12px;}
+  .ls-events{position:relative; display:grid; grid-template-columns:1fr 1fr; gap:10px 14px;}
+  .ls-events-col{min-width:0;}
+  .ls-events-col.side-b{text-align:right;}
+  .ls-event-row{display:flex; align-items:center; gap:5px; font-size:10.5px; color:rgba(255,255,255,.75); margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .ls-events-col.side-b .ls-event-row{flex-direction:row-reverse;}
+  .ls-event-row input.inline-edit, .ls-event-row input.inline-edit-num{background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.2); color:#fff;}
+  .ls-event-row .icon-btn{color:rgba(255,255,255,.5);}
+  .ls-empty-events{font-size:10px; color:rgba(255,255,255,.35); font-style:italic;}
+  .ls-add-btns{display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;}
+  .ls-events-col.side-b .ls-add-btns{justify-content:flex-end;}
+  .ls-add-btn{display:flex; align-items:center; gap:4px; font-size:10px; padding:5px 9px; border-radius:999px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16); color:rgba(255,255,255,.85); cursor:pointer;}
+  .ls-add-btn:hover{background:rgba(255,255,255,.15);}
+  @media(min-width:480px){
+    .ls-team{width:100px;}
+    .ls-crest{height:52px; width:52px; font-size:16px;}
+    .ls-team-name{font-size:13.5px;}
+    .ls-score-nums{font-size:40px;}
+  }
+  @media(min-width:900px){
+    .live-scoreboard{padding:30px 26px 24px;}
+    .ls-team{width:150px;}
+    .ls-crest{height:64px; width:64px; font-size:20px;}
+    .ls-team-name{font-size:15px; margin-top:10px;}
+    .ls-score-nums{font-size:52px; gap:14px;}
+    .ls-clock{font-size:12px; padding:5px 12px;}
+    .ls-event-row{font-size:12px;}
+    .ls-divider{margin:22px 0 16px;}
   }
 
   /* editable */
@@ -1278,43 +1312,71 @@ function buildLivePanel(t){
   ]);
   panel.appendChild(top);
 
-  function teamBlock(side, team){
-    const crest = h('div', {class:'team-crest ' + (side==='teamA'?'a':'b')}, initials(team.name));
-    const nameEl = editableText(function(){return team.name;}, function(v){ team.name=v; }, 'team-info-name');
-    const cardRow = h('div', {class:'card-row'}, [
+  function teamColumn(side, team){
+    const fullTeam = t.teams.find(function(tm){ return tm.id===team.id; }) || t.teams.find(function(tm){ return tm.name===team.name; });
+    const logoUrl = fullTeam && fullTeam.logoUrl;
+    const crest = h('div', {class:'ls-crest ' + (side==='teamA'?'a':'b')}, logoUrl ? h('img',{src:logoUrl}) : initials(team.name));
+    const nameWrap = h('div', {class:'ls-team-name'}, [editableText(function(){return team.name;}, function(v){ team.name=v; }, '')]);
+    const cardsWrap = h('div', {class:'ls-cards'}, [
       h('span',{class:'card-chip'}, [h('span',{class:'card-y'}), editableNumber(function(){return team.yellow;}, function(v){team.yellow=v;}, '')]),
       h('span',{class:'card-chip'}, [h('span',{class:'card-r'}), editableNumber(function(){return team.red;}, function(v){team.red=v;}, '')]),
     ]);
-    const scorers = buildEventList(team.scorers, 'goal', function(i){ team.scorers.splice(i,1); if(team.score>0) team.score--; render(); });
-    const cardsList = buildEventList(team.cards||[], 'card', function(i){
-      const c = team.cards[i];
-      team.cards.splice(i,1); if(c.type==='red' && team.red>0) team.red--; if(c.type==='yellow' && team.yellow>0) team.yellow--; render();
-    });
-    const infoBlock = h('div', {style:{minWidth:0}}, [nameEl, cardRow, scorers, cardsList]);
+    return h('div', {class:'ls-team'}, [crest, nameWrap, cardsWrap]);
+  }
+
+  function eventRow(item, kind, onRemove){
+    const dot = kind==='goal' ? '⚽' : (item.type==='red' ? h('span',{class:'card-r'}) : h('span',{class:'card-y'}));
+    const nameEl = editableText(function(){return item.name;}, function(v){item.name=v;}, '');
+    const minuteEl = editableNumber(function(){return item.minute;}, function(v){item.minute=v;}, '', {min:0});
+    const children = state.adminMode
+      ? [dot, nameEl, minuteEl, h('span',{class:'text-xs', style:{opacity:.6}},"'"), h('button',{class:'icon-btn', style:{padding:'0', width:'13px', height:'13px'}, onclick:onRemove}, icon('x',9))]
+      : [dot, h('span',{}, item.name), h('span',{class:'text-xs', style:{opacity:.6}}, item.minute+"'")];
+    return h('div', {class:'ls-event-row'}, children);
+  }
+
+  function eventsColumn(side, team){
+    const col = h('div', {class:'ls-events-col ' + (side==='teamA'?'side-a':'side-b')});
+    const scorers = team.scorers||[], cards = team.cards||[];
+    if (scorers.length===0 && cards.length===0){
+      col.appendChild(h('div', {class:'ls-empty-events'}, 'Belum ada catatan.'));
+    } else {
+      scorers.forEach(function(item,i){ col.appendChild(eventRow(item, 'goal', function(){ team.scorers.splice(i,1); if(team.score>0) team.score--; render(); })); });
+      cards.forEach(function(item,i){ col.appendChild(eventRow(item, 'card', function(){
+        team.cards.splice(i,1); if(item.type==='red' && team.red>0) team.red--; if(item.type==='yellow' && team.yellow>0) team.yellow--; render();
+      })); });
+    }
     if (state.adminMode){
-      infoBlock.appendChild(h('div', {class:'live-event-btns'}, [
-        h('button', {class:'btn btn-ghost-blue', style:{fontSize:'10px', padding:'4px 8px'}, onclick:function(){ state.showAddEvent={side:side, type:'goal'}; render(); }}, [icon('plus',10), 'Gol']),
-        h('button', {class:'btn btn-ghost-purple', style:{fontSize:'10px', padding:'4px 8px'}, onclick:function(){ state.showAddEvent={side:side, type:'card'}; render(); }}, [icon('plus',10), 'Kartu']),
+      col.appendChild(h('div', {class:'ls-add-btns'}, [
+        h('button', {class:'ls-add-btn', onclick:function(){ state.showAddEvent={side:side, type:'goal'}; render(); }}, [icon('plus',10), 'Gol']),
+        h('button', {class:'ls-add-btn', onclick:function(){ state.showAddEvent={side:side, type:'card'}; render(); }}, [cardsIcon(11), 'Kartu']),
       ]));
     }
-    return h('div', {class:'team-block'}, [crest, infoBlock]);
+    return col;
   }
 
   const mc = t.matchConfig || {halfMinutes:10, halves:2};
   const totalMin = mc.halfMinutes * mc.halves;
   const babak = Math.min(mc.halves, Math.floor(t.liveMatch.minute / mc.halfMinutes) + 1);
-  const scoreCenter = h('div', {class:'score-center'}, [
-    h('div', {class:'score-nums'}, [
-      editableNumber(function(){return t.liveMatch.teamA.score;}, function(v){t.liveMatch.teamA.score=v;}, '', {}),
-      h('span',{class:'score-sep'},':'),
-      editableNumber(function(){return t.liveMatch.teamB.score;}, function(v){t.liveMatch.teamB.score=v;}, '', {}),
-    ]),
-    h('div', {class:'clock'}, [icon('clock',13), String(t.liveMatch.minute).padStart(2,'0')+':'+String(t.liveMatch.second).padStart(2,'0')+' / '+totalMin+':00']),
-    h('div', {class:'text-xs muted', style:{marginTop:'2px'}}, 'Babak ' + babak + (mc.halves>1 ? '/'+mc.halves : ''))
-  ]);
 
-  const row = h('div', {class:'score-row'}, [teamBlock('teamA', t.liveMatch.teamA), scoreCenter, teamBlock('teamB', t.liveMatch.teamB)]);
-  panel.appendChild(h('div', {class:'score-row-wrap scrollbar'}, [row]));
+  const scoreboard = h('div', {class:'live-scoreboard'}, [
+    h('div', {class:'ls-glow ls-glow-a'}), h('div', {class:'ls-glow ls-glow-b'}),
+    h('div', {class:'ls-meta'}, t.name + ' • Babak ' + babak + (mc.halves>1 ? '/'+mc.halves : '')),
+    h('div', {class:'ls-main'}, [
+      teamColumn('teamA', t.liveMatch.teamA),
+      h('div', {class:'ls-score'}, [
+        h('div', {class:'ls-score-nums'}, [
+          editableNumber(function(){return t.liveMatch.teamA.score;}, function(v){t.liveMatch.teamA.score=v;}, '', {}),
+          h('span',{class:'ls-score-sep'},'-'),
+          editableNumber(function(){return t.liveMatch.teamB.score;}, function(v){t.liveMatch.teamB.score=v;}, '', {}),
+        ]),
+        h('div', {class:'ls-clock'}, [icon('clock',11), String(t.liveMatch.minute).padStart(2,'0')+':'+String(t.liveMatch.second).padStart(2,'0')+' / '+totalMin+':00']),
+      ]),
+      teamColumn('teamB', t.liveMatch.teamB),
+    ]),
+    h('div', {class:'ls-divider'}),
+    h('div', {class:'ls-events'}, [eventsColumn('teamA', t.liveMatch.teamA), eventsColumn('teamB', t.liveMatch.teamB)]),
+  ]);
+  panel.appendChild(scoreboard);
   return panel;
 }
 
