@@ -1728,12 +1728,38 @@ function undoMatchResultFromStandings(t, teamAId, teamBId, scoreA, scoreB){
   else if (scoreB>scoreA){ if(b){ b.stats.pts=Math.max(0,(b.stats.pts||0)-3); b.stats.win=Math.max(0,(b.stats.win||0)-1); } if(a){ a.stats.lose=Math.max(0,(a.stats.lose||0)-1); } }
   else { if(a){ a.stats.pts=Math.max(0,(a.stats.pts||0)-1); a.stats.draw=Math.max(0,(a.stats.draw||0)-1); } if(b){ b.stats.pts=Math.max(0,(b.stats.pts||0)-1); b.stats.draw=Math.max(0,(b.stats.draw||0)-1); } }
 }
+// Best Goalkeepers: kalau tim kebobolan 0 gol di sebuah pertandingan, kiper tim itu (pemain
+// dengan posisi "GK" di skuad) otomatis dapat +1 clean sheet. Kalau tim belum punya pemain
+// yang ditandai posisi GK, tidak ada yang bisa di-attribute jadi dilewati saja.
+function bumpCleanSheet(t, teamId, delta){
+  const team = t.teams.find(function(x){return x.id===teamId;});
+  if (!team) return;
+  const gk = team.players.find(function(p){return p.position==='GK';});
+  if (!gk) return;
+  if (!t.bestGK) t.bestGK = [];
+  const existing = t.bestGK.find(function(g){ return g.name.toLowerCase()===gk.name.toLowerCase() && g.team===team.name; });
+  if (existing){ existing.cleanSheets = Math.max(0, (existing.cleanSheets||0) + delta); }
+  else if (delta > 0){ t.bestGK.push({id:nextId(), name:gk.name, team:team.name, cleanSheets:delta}); }
+}
+function applyCleanSheets(t, teamAId, teamBId, scoreA, scoreB){
+  if (Number(scoreB)===0) bumpCleanSheet(t, teamAId, 1); // Tim A clean sheet kalau Tim B tidak cetak gol
+  if (Number(scoreA)===0) bumpCleanSheet(t, teamBId, 1); // Tim B clean sheet kalau Tim A tidak cetak gol
+}
+function undoCleanSheets(t, teamAId, teamBId, scoreA, scoreB){
+  if (Number(scoreB)===0) bumpCleanSheet(t, teamAId, -1);
+  if (Number(scoreA)===0) bumpCleanSheet(t, teamBId, -1);
+}
+
 // Dipakai saat admin edit manual skor pertandingan yang sudah "Selesai" — klasemen & bagan ikut disesuaikan.
 function setFixtureScore(t, s, side, value){
-  if (s.statsApplied) undoMatchResultFromStandings(t, s.teamAId, s.teamBId, s.scoreA, s.scoreB);
+  if (s.statsApplied){
+    undoMatchResultFromStandings(t, s.teamAId, s.teamBId, s.scoreA, s.scoreB);
+    undoCleanSheets(t, s.teamAId, s.teamBId, s.scoreA, s.scoreB);
+  }
   if (side==='a') s.scoreA = value; else s.scoreB = value;
   if (s.statsApplied){
     applyMatchResultToStandings(t, s.teamAId, s.teamBId, s.scoreA, s.scoreB);
+    applyCleanSheets(t, s.teamAId, s.teamBId, s.scoreA, s.scoreB);
     const an = (t.teams.find(function(x){return x.id===s.teamAId;})||{}).name;
     const bn = (t.teams.find(function(x){return x.id===s.teamBId;})||{}).name;
     if (an && bn) syncBracketScore(t, an, bn, Number(s.scoreA)||0, Number(s.scoreB)||0);
@@ -1756,6 +1782,7 @@ function finalizeFixture(t, s){
     // Live (mis. skor/gol direvisi) — lepas dulu statistik lama sebelum menimpa dengan yang baru,
     // supaya klasemen tidak dobel terhitung.
     undoMatchResultFromStandings(t, s.teamAId, s.teamBId, s.scoreA, s.scoreB);
+    undoCleanSheets(t, s.teamAId, s.teamBId, s.scoreA, s.scoreB);
     s.statsApplied = false;
   }
   if (lmMatches){
@@ -1771,6 +1798,7 @@ function finalizeFixture(t, s){
   if (s.statsApplied){ s.status='finished'; if (lmMatches) t.liveMatch=null; return; }
   s.status = 'finished';
   applyMatchResultToStandings(t, s.teamAId, s.teamBId, s.scoreA, s.scoreB);
+  applyCleanSheets(t, s.teamAId, s.teamBId, s.scoreA, s.scoreB);
   if (teamAName && teamBName) syncBracketScore(t, teamAName, teamBName, Number(s.scoreA)||0, Number(s.scoreB)||0);
   syncBracketFromGroupWinners(t);
   s.statsApplied = true;
