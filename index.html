@@ -348,6 +348,7 @@
   .bp-v-side{position:relative; flex-shrink:0;}
   .bp-v-team-box{position:relative; z-index:2; background:rgba(255,255,255,.94); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:8px;}
   .bp-v-team-box.winner{background:linear-gradient(135deg,#fde68a,#f59e0b); box-shadow:0 4px 14px -4px rgba(245,158,11,.6);}
+  .bp-v-team-box.mirrored .bp-v-name{text-align:right;}
   .bp-v-team-box.placeholder{background:rgba(255,255,255,.55);}
   .bp-v-team-box.placeholder .bp-v-name{font-style:italic; color:#4b4468;}
   .bp-v-team-box .bp-v-name{font-weight:700; font-size:12.5px; color:#211a3a; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
@@ -2076,7 +2077,7 @@ function connLineV(x, yTop, height){
   return h('div', {class:'bracket-line-v', style:{left:x+'px', top:yTop+'px', height:Math.max(height,0)+'px'}});
 }
 
-function bpVTeamBox(t, match, isA){
+function bpVTeamBox(t, match, isA, mirrored){
   const name = isA ? match.a : match.b;
   const isWinner = match.winner === (isA ? 'a' : 'b');
   const team = t.teams.find(function(tm){ return tm.name===name; });
@@ -2085,12 +2086,12 @@ function bpVTeamBox(t, match, isA){
   // sebelum itu (mis. masih fase penyisihan grup, semifinal belum dijadwalkan/dimainkan),
   // jangan tampilkan "0" yang bisa disalahartikan seolah sudah ada hasil.
   const scoreEl = match.winner ? h('span', {class:'font-bold'}, String(isA?match.scoreA:match.scoreB)) : null;
-  return h('div', {class:'bp-v-team-box' + (isWinner?' winner':'') + (team?'':' placeholder')}, [
-    crest,
-    isWinner ? icon('trophy',11) : null,
-    h('span', {class:'bp-v-name'}, name),
-    scoreEl
-  ]);
+  const trophyEl = isWinner ? icon('trophy',11) : null;
+  const nameEl = h('span', {class:'bp-v-name'}, name);
+  // Sisi kiri bagan: logo dulu baru nama (rata kiri). Sisi kanan bagan: dicerminkan —
+  // nama duluan (teksnya rata kanan, nempel ke logo), logo di ujung kanan.
+  const children = mirrored ? [scoreEl, trophyEl, nameEl, crest] : [crest, trophyEl, nameEl, scoreEl];
+  return h('div', {class:'bp-v-team-box' + (isWinner?' winner':'') + (team?'':' placeholder') + (mirrored?' mirrored':'')}, children);
 }
 
 // Layout khusus 2 semifinal -> final, bentuk "V" ketemu di tengah — niru poster bagan referensi.
@@ -2137,8 +2138,8 @@ function buildBracketPosterVShape(t, panel, rounds){
   const leftSide = sideEl(sfMatches[0], false);
   const rightSideInner = h('div', {class:'bp-v-side', style:{width:SIDE_W+'px', height:totalH+'px'}});
   // sisi kanan: box digeser ke kanan (setelah garis), garis keluar dari kiri box menuju tengah
-  const rBoxA = bpVTeamBox(t, sfMatches[1], true); Object.assign(rBoxA.style, {position:'absolute', top:(y1-BOX_H/2)+'px', left:GAP_W+'px', width:SIDE_W+'px'});
-  const rBoxB = bpVTeamBox(t, sfMatches[1], false); Object.assign(rBoxB.style, {position:'absolute', top:(y2-BOX_H/2)+'px', left:GAP_W+'px', width:SIDE_W+'px'});
+  const rBoxA = bpVTeamBox(t, sfMatches[1], true, true); Object.assign(rBoxA.style, {position:'absolute', top:(y1-BOX_H/2)+'px', left:GAP_W+'px', width:SIDE_W+'px'});
+  const rBoxB = bpVTeamBox(t, sfMatches[1], false, true); Object.assign(rBoxB.style, {position:'absolute', top:(y2-BOX_H/2)+'px', left:GAP_W+'px', width:SIDE_W+'px'});
   rightSideInner.appendChild(rBoxA); rightSideInner.appendChild(rBoxB);
   rightSideInner.style.width = (SIDE_W+GAP_W)+'px';
   const xMidR = GAP_W/2;
