@@ -1517,6 +1517,7 @@ function ensureLiveTimer(){
 /* ---------- GUARD: cegah render otomatis (dari background/Firebase) menutup paksa
    kalender/jam yang lagi kebuka, dropdown, atau input yang lagi diketik ---------- */
 let pendingBackgroundRender = false;
+let pendingBackgroundRenderSince = 0;
 function shouldSkipAutoRender(){
   // Modal terbuka -> jangan render ulang di belakang layar (biar isian di form tidak hilang).
   if (state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showAddFixtureEvent || state.showBracketWinner || state.showAdminLogin || state.showEditPlayer) return true;
@@ -1530,12 +1531,22 @@ function shouldSkipAutoRender(){
 // kapan saja di belakang layar. Kalau lagi tidak aman untuk render ulang, tunda dulu
 // dan biarkan interval flush di bawah yang menyelesaikannya begitu user selesai berinteraksi.
 function safeRender(){
-  if (shouldSkipAutoRender()){ pendingBackgroundRender = true; return; }
+  if (shouldSkipAutoRender()){
+    if (!pendingBackgroundRender) pendingBackgroundRenderSince = Date.now();
+    pendingBackgroundRender = true;
+    return;
+  }
   pendingBackgroundRender = false;
   render();
 }
 setInterval(function(){
-  if (pendingBackgroundRender && !shouldSkipAutoRender()){
+  if (!pendingBackgroundRender) return;
+  // Kalau field yang lagi fokus dibiarkan berlarut-larut (mis. kursor ketinggalan di suatu
+  // kolom tanpa pernah diklik lagi), update dari device lain bisa numpuk tak terlihat tanpa
+  // batas waktu. Setelah 12 detik, paksa tampilkan update terbaru — lebih baik daripada
+  // layar yang ketinggalan jauh dari data sebenarnya.
+  const stuckTooLong = pendingBackgroundRenderSince && (Date.now() - pendingBackgroundRenderSince > 12000);
+  if (!shouldSkipAutoRender() || stuckTooLong){
     pendingBackgroundRender = false;
     render();
   }
