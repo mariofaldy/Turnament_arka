@@ -2209,7 +2209,9 @@ function buildBracketPosterVShape(t, panel, rounds){
   function applyScale(){
     const availW = scaleWrap.clientWidth;
     const scale = Math.min(1, availW / totalContentW);
+    const offsetX = Math.max(0, (availW - totalContentW * scale) / 2);
     scaleInner.style.transform = 'scale(' + scale + ')';
+    scaleInner.style.marginLeft = offsetX + 'px';
     scaleWrap.style.height = (totalH * scale) + 'px';
   }
   requestAnimationFrame(applyScale);
@@ -2219,8 +2221,10 @@ function buildBracketPosterVShape(t, panel, rounds){
         const inner = el.querySelector('.bp-v-scale-inner');
         if (!inner) return;
         const w = parseInt(inner.style.width, 10) || 1;
-        const s = Math.min(1, el.clientWidth / w);
+        const availW = el.clientWidth;
+        const s = Math.min(1, availW / w);
         inner.style.transform = 'scale(' + s + ')';
+        inner.style.marginLeft = Math.max(0, (availW - w * s) / 2) + 'px';
       });
     });
     window._bracketResizeBound = true;
