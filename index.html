@@ -3346,6 +3346,11 @@ function initFirebase(){
   try{
     firebase.initializeApp(FIREBASE_CONFIG);
     fbDb = firebase.firestore();
+    // Beberapa jaringan/ekstensi browser (ad-blocker, privacy shield, WiFi kantor/sekolah yang ketat)
+    // suka memblokir koneksi real-time default Firestore (muncul sebagai error "Listen/channel 400").
+    // Deteksi otomatis dan pindah ke mode long-polling kalau itu terjadi, supaya sinkronisasi tetap
+    // jalan walau koneksi WebSocket/streaming-nya diblokir.
+    fbDb.settings({ experimentalAutoDetectLongPolling: true, useFetchStreams: false });
   } catch(err){
     console.error('Firebase init error:', err);
     setFbStatus('error'); render(); ensureLiveTimer(); return;
