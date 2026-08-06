@@ -361,6 +361,8 @@
   .bp-v-center-label{font-family:'Rajdhani',sans-serif; font-weight:800; font-size:17px; color:#fff; letter-spacing:.06em; margin-top:2px;}
   .bp-v-center-sub{font-size:9.5px; color:rgba(255,255,255,.55); text-align:center; max-width:130px;}
   .bp-v-center-score{margin-top:2px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.22); border-radius:8px; padding:5px 14px; font-weight:800; color:#fff; font-size:13px; font-family:'Rajdhani',sans-serif;}
+  .bp-v-scale-outer{width:100%; overflow:hidden; position:relative;}
+  .bp-v-scale-inner{transform-origin:top left;}
 
   /* players */
   .player-list{display:flex; flex-direction:column; gap:12px;}
@@ -2181,7 +2183,35 @@ function buildBracketPosterVShape(t, panel, rounds){
   centerCol.appendChild(centerStack);
 
   const wrap = h('div', {class:'bp-v-wrap'}, [leftSide, centerCol, rightSideInner]);
-  panel.appendChild(h('div', {class:'bracket-tree-scroll scrollbar'}, [wrap]));
+  // Lebar bagan ini tetap (piksel absolut) supaya garis penghubungnya presisi, tapi itu bikin
+  // kepotong di layar HP yang sempit. Solusinya: bungkus dengan CSS transform:scale() supaya
+  // seluruh bagan otomatis menyusut mengikuti lebar layar yang tersedia, tanpa perlu geser.
+  const totalContentW = SIDE_W + CENTER_W + SIDE_W + GAP_W; // = 584
+  const scaleWrap = h('div', {class:'bp-v-scale-outer'});
+  const scaleInner = h('div', {class:'bp-v-scale-inner', style:{width:totalContentW+'px'}}, [wrap]);
+  scaleWrap.appendChild(scaleInner);
+  panel.appendChild(scaleWrap);
+  // Set via CSS custom property + JS resize listener supaya skalanya pas dengan lebar panel
+  // yang sebenarnya (bukan sekadar breakpoint tebakan), dan otomatis update saat layar diputar/resize.
+  function applyScale(){
+    const availW = scaleWrap.clientWidth;
+    const scale = Math.min(1, availW / totalContentW);
+    scaleInner.style.transform = 'scale(' + scale + ')';
+    scaleWrap.style.height = (totalH * scale) + 'px';
+  }
+  requestAnimationFrame(applyScale);
+  if (!window._bracketResizeBound){
+    window.addEventListener('resize', function(){
+      document.querySelectorAll('.bp-v-scale-outer').forEach(function(el){
+        const inner = el.querySelector('.bp-v-scale-inner');
+        if (!inner) return;
+        const w = parseInt(inner.style.width, 10) || 1;
+        const s = Math.min(1, el.clientWidth / w);
+        inner.style.transform = 'scale(' + s + ')';
+      });
+    });
+    window._bracketResizeBound = true;
+  }
 }
 
 function buildBracketPanel(t){
