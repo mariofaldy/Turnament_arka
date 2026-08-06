@@ -2106,11 +2106,24 @@ function buildBracketPosterVShape(t, panel, rounds){
   const totalH = BOX_H*2 + GAP_BETWEEN;
   const y1 = BOX_H/2, y2 = BOX_H + GAP_BETWEEN + BOX_H/2, yMid = totalH/2;
   function isRealTeam(name){ return t.teams.some(function(tm){return tm.name===name;}); }
+  // Cari jadwal (dari halaman Jadwal & Fixtures) yang timnya cocok sama pertandingan bagan ini —
+  // supaya tanggal/jam yang diisi di sana ikut muncul di sini juga.
+  function findScheduleMatch(m){
+    const teamA = t.teams.find(function(tm){return tm.name===m.a;});
+    const teamB = t.teams.find(function(tm){return tm.name===m.b;});
+    if (!teamA || !teamB) return null;
+    return t.schedule.find(function(s){
+      return (s.teamAId===teamA.id && s.teamBId===teamB.id) || (s.teamAId===teamB.id && s.teamBId===teamA.id);
+    }) || null;
+  }
 
   function statusLabel(m){
     if (!isRealTeam(m.a) || !isRealTeam(m.b)) return 'Menunggu Hasil Grup';
     if (m.winner) return (m.winner==='a'?m.a:m.b) + ' Menang';
-    return 'Menunggu Hasil';
+    const sched = findScheduleMatch(m);
+    if (sched && sched.status!=='finished') return sched.date + ' • ' + sched.time;
+    if (sched && sched.status==='finished') return sched.scoreA+' - '+sched.scoreB+' (belum ditentukan pemenang)';
+    return 'Belum Dijadwalkan';
   }
 
   function sideEl(match, mirrored){
