@@ -355,7 +355,9 @@
   .bp-v-mid-label{position:absolute; z-index:2; left:50%; transform:translate(-50%,-50%); font-size:9.5px; color:rgba(255,255,255,.55); white-space:nowrap; background:linear-gradient(150deg,#2a1454,#3d1a6b); padding:2px 6px;}
   .bp-v-btn-wrap{position:absolute; z-index:2; left:50%; transform:translateX(-50%); white-space:nowrap;}
   .bp-v-center{flex-shrink:0; padding:0 14px; position:relative; z-index:2; width:150px;}
-  .bp-v-center-stack{position:absolute; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:5px; width:150px;}
+  .bp-v-center-stack{position:absolute; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; width:150px;}
+  .bp-v-center-core{display:flex; flex-direction:column; align-items:center; gap:5px;}
+  .bp-v-center-extra{display:flex; flex-direction:column; align-items:center; gap:5px; margin-top:5px;}
   .bp-v-center-label{font-family:'Rajdhani',sans-serif; font-weight:800; font-size:17px; color:#fff; letter-spacing:.06em; margin-top:2px;}
   .bp-v-center-sub{font-size:9.5px; color:rgba(255,255,255,.55); text-align:center; max-width:130px;}
   .bp-v-center-score{margin-top:2px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.22); border-radius:8px; padding:5px 14px; font-weight:800; color:#fff; font-size:13px; font-family:'Rajdhani',sans-serif;}
@@ -2159,9 +2161,15 @@ function buildBracketPosterVShape(t, panel, rounds){
   const finalDone = isRealTeam(finalMatch.a) && isRealTeam(finalMatch.b);
   const championName = finalMatch.winner ? (finalMatch.winner==='a'?finalMatch.a:finalMatch.b) : null;
   const centerCol = h('div', {class:'bp-v-center', style:{height:totalH+'px'}});
-  const centerStack = h('div', {class:'bp-v-center-stack', style:{top:(yMid-15)+'px'}}, [
+  // "Inti" (trofi + label ronde) yang dipatok presisi di tengah (yMid) — keterangan tambahan
+  // (lawan, skor, juara, tombol) ngalir normal di BAWAH inti ini, tidak ikut mempengaruhi
+  // titik tengahnya supaya trofinya selalu pas di tengah berapa pun banyaknya baris tambahan.
+  const CORE_H = 57; // perkiraan tinggi trofi(30) + jarak(5) + label ronde(~22)
+  const coreEl = h('div', {class:'bp-v-center-core'}, [
     icon('trophy', 30, 'gs-hero-trophy'),
     h('div', {class:'bp-v-center-label'}, rounds[1].name.toUpperCase()),
+  ]);
+  const extraEl = h('div', {class:'bp-v-center-extra'}, [
     h('div', {class:'bp-v-center-sub'}, finalDone ? (finalMatch.a+' vs '+finalMatch.b) : 'Menunggu Semifinalis'),
     finalDone ? h('div', {class:'bp-v-center-score'}, finalMatch.scoreA+' - '+finalMatch.scoreB) : null,
     championName ? h('div', {class:'bp-v-center-sub', style:{color:'var(--acc-amber-text)', fontWeight:'700', marginTop:'2px'}}, '🏆 '+championName) : null,
@@ -2169,6 +2177,7 @@ function buildBracketPosterVShape(t, panel, rounds){
       state.showBracketWinner = {ri:1, mi:0}; render();
     }}, finalMatch.winner ? 'Ubah Juara' : 'Tentukan Juara') : null,
   ]);
+  const centerStack = h('div', {class:'bp-v-center-stack', style:{top:(yMid-CORE_H/2-18)+'px', left:'calc(50% + 16px)'}}, [coreEl, extraEl]);
   centerCol.appendChild(centerStack);
 
   const wrap = h('div', {class:'bp-v-wrap'}, [leftSide, centerCol, rightSideInner]);
