@@ -3377,22 +3377,25 @@ function initFirebase(){
     }
     fbReady = true; setFbStatus('synced');
     safeRender(); ensureLiveTimer();
-    docRef.onSnapshot(function(snap){
-      if (!snap.exists) return;
-      // Kalau ada perubahan lokal yang belum selesai terkirim ke server (mis. baru
-      // saja klik "Simpan Gol"/"Simpan Kartu"), JANGAN timpa dulu dengan data lama
-      // dari snapshot ini — nanti begitu tulisan lokal kelar, snapshot barunya yang
-      // sudah termasuk perubahan itu akan datang dan diterapkan seperti biasa.
-      if (fbWritePending) return;
-      fbApplyingRemote = true;
-      const applied = fbApplySnapshot(snap.data());
-      fbApplyingRemote = false;
-      if (!applied && fbUser){ scheduleSave(); return; }
-      safeRender();
-    }, function(err){
-      console.error('Firebase realtime sync error:', err);
-      setFbStatus('error');
-    });
+    // Dulu di sini pakai docRef.onSnapshot() (koneksi real-time/streaming). Sayangnya koneksi
+    // jenis itu ("Listen channel") kadang diblokir ad-blocker/ekstensi browser atau jaringan
+    // tertentu — muncul sebagai error "400" dan bikin device itu selamanya gagal menerima update.
+    // Sebagai gantinya, cek data terbaru secara berkala pakai request biasa (docRef.get()) yang
+    // jauh lebih tahan terhadap gangguan semacam itu — update jadi tiap beberapa detik, bukan
+    // instan, tapi jauh lebih bisa diandalkan.
+    setInterval(function(){
+      if (fbWritePending) return; // ada tulisan lokal yang belum kelar, jangan ditimpa dulu
+      docRef.get().then(function(snap){
+        if (!snap.exists) return;
+        fbApplyingRemote = true;
+        const applied = fbApplySnapshot(snap.data());
+        fbApplyingRemote = false;
+        if (!applied && fbUser){ scheduleSave(); return; }
+        safeRender();
+      }).catch(function(err){
+        console.error('Gagal polling data terbaru dari Firebase:', err);
+      });
+    }, 4000);
   }).catch(function(err){
     console.error('Firebase get error:', err);
     setFbStatus('error'); fbReady = true; render(); ensureLiveTimer();
