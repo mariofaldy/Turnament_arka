@@ -946,12 +946,14 @@ function buildSidebar(t){
   ]);
   sb.appendChild(top);
 
-  sb.appendChild(h('div', {style:{padding:'0 16px'}}, [
-    h('button', {class:'new-tourn-btn', onclick:function(){ state.showAddTournament=true; render(); }}, [icon('plus',14), 'Turnamen Baru'])
-  ]));
+  if (state.adminMode){
+    sb.appendChild(h('div', {style:{padding:'0 16px'}}, [
+      h('button', {class:'new-tourn-btn', onclick:function(){ state.showAddTournament=true; render(); }}, [icon('plus',14), 'Turnamen Baru'])
+    ]));
+  }
 
   const nav = h('nav', {class:'nav'});
-  NAV_ITEMS.forEach(function(item){
+  NAV_ITEMS.filter(function(item){ return item.key!=='admin' || state.adminMode; }).forEach(function(item){
     const isActive = state.active === item.key;
     const btn = h('button', {class:'nav-item' + (isActive?' active':''), onclick:function(){ state.active=item.key; state.sidebarOpen=false; render(); }}, [
       icon(item.ic, 17),
@@ -1415,7 +1417,7 @@ function buildLivePanel(t){
   const top = h('div', {class:'live-top'}, [
     h('div', {class:'flex items-center gap-2'}, [h('span',{class:'live-dot'}), h('span',{class:'live-label'},'LIVE')]),
     h('div', {class:'flex items-center gap-2'}, [
-      h('button', {class:'pause-btn', onclick:function(){ state.liveRunning=!state.liveRunning; render(); }}, [icon(state.liveRunning?'pause':'play',12), state.liveRunning?'Jeda':'Lanjut']),
+      state.adminMode ? h('button', {class:'pause-btn', onclick:function(){ state.liveRunning=!state.liveRunning; render(); }}, [icon(state.liveRunning?'pause':'play',12), state.liveRunning?'Jeda':'Lanjut']) : null,
       state.adminMode ? h('button', {class:'btn btn-ghost-purple', style:{fontSize:'11px', padding:'6px 10px'}, onclick:function(){
         if (!confirm('Reset pertandingan ini? Waktu kembali ke 00:00, skor, gol, dan kartu juga ikut kembali ke 0. Aksi ini tidak bisa dibatalkan.')) return;
         t.liveMatch.minute = 0; t.liveMatch.second = 0;
@@ -2826,6 +2828,12 @@ function buildFixturesPage(t){
 
 /* ---------- ADMIN SETTINGS PAGE ---------- */
 function buildAdminSettingsPage(t){
+  if (!state.adminMode){
+    const denied = h('div', {class:'panel'});
+    denied.appendChild(sectionTitle('settings', 'Pengaturan Turnamen'));
+    denied.appendChild(h('p', {class:'text-sm muted'}, 'Halaman ini khusus untuk admin. Nyalakan Mode Admin di sidebar untuk mengaksesnya.'));
+    return denied;
+  }
   const wrap = h('div', {class:'flex-col gap-6'});
 
   const panel1 = h('div', {class:'panel'});
