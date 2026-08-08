@@ -3210,7 +3210,8 @@ function buildAdminSettingsPage(t){
     ? h('img', {src:t.logoImageUrl, style:{height:'64px', width:'64px', objectFit:'contain', borderRadius:'10px', background:'rgba(0,0,0,.15)'}})
     : h('div', {class:'text-xs muted', style:{height:'64px', width:'64px', display:'flex', alignItems:'center', justifyContent:'center', border:'1px dashed var(--border)', borderRadius:'10px'}}, 'Belum ada');
   logoPreviewRow.appendChild(logoPreview);
-  const logoUploadBtn = h('button', {class:'btn btn-ghost-blue', onclick:function(){
+  const logoUploadBtn = h('button', {class:'btn btn-ghost-blue', type:'button', onclick:function(e){
+    e.preventDefault(); e.stopPropagation();
     pickImageFile(function(file){
       compressImageFile(file, function(dataUrl, errMsg){
         if (!dataUrl){ alert(errMsg || 'Gagal memuat logo.'); return; }
@@ -3228,10 +3229,7 @@ function buildAdminSettingsPage(t){
 
   const igWrap = h('div', {style:{marginBottom:'18px'}});
   igWrap.appendChild(h('label', {class:'form-label'}, 'Instagram (buat poster Match Result)'));
-  const igInput = h('input', {type:'text', class:'form-input', placeholder:'nama_akun_instagram', value:t.igHandle||''});
-  igInput.addEventListener('input', function(e){ t.igHandle = e.target.value; });
-  igInput.addEventListener('change', function(){ render(); });
-  igWrap.appendChild(igInput);
+  igWrap.appendChild(editableText(function(){return t.igHandle||'';}, function(v){t.igHandle=v;}, 'form-input text-wide'));
   panel1.appendChild(igWrap);
 
   panel1.appendChild(h('div', {}, [h('label',{class:'form-label'},'Logo / Emoji Turnamen'), (function(){
@@ -3686,7 +3684,10 @@ function fbApplySnapshot(data){
   // (mis. baru saja refresh sebelum tulisan sempat sampai ke server karena koneksi lambat),
   // JANGAN ditimpa — pertahankan data lokal yang lebih baru dan biarkan penulisan berikutnya
   // memperbaiki data di server. Ini yang mencegah "hasil pertandingan hilang pas refresh".
-  if (data.savedAt && localDataSavedAt && data.savedAt < localDataSavedAt) return false;
+  if (data.savedAt && localDataSavedAt && data.savedAt < localDataSavedAt){
+    console.warn('Menolak data server yang lebih basi (server:', data.savedAt, 'vs lokal:', localDataSavedAt, ') — data lokal dipertahankan.');
+    return false;
+  }
   state.tournaments = data.tournaments;
   state.activeId = (data.activeId && data.tournaments.some(function(t){return t.id===data.activeId;})) ? data.activeId : data.tournaments[0].id;
   if (data.savedAt) localDataSavedAt = data.savedAt;
