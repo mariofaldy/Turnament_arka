@@ -1333,8 +1333,8 @@ function editableNumber(getVal, setVal, className, opts){
    maupun kuota localStorage — akibatnya penyimpanan gagal diam-diam dan logo
    "hilang" lagi. Jadi setiap gambar di-resize ke kotak kecil dan dikompres
    ke JPEG dulu, hasilnya cuma belasan KB per logo. */
-const LOGO_MAX_PX = 256;      // sisi terpanjang logo setelah di-resize
-const LOGO_QUALITY = 0.82;    // kualitas JPEG (0-1)
+const LOGO_MAX_PX = 220;      // sisi terpanjang logo setelah di-resize
+const LOGO_QUALITY = 0.76;    // kualitas JPEG (0-1)
 
 function compressImageFile(file, cb){
   if (!file || !/^image\//.test(file.type)){ cb(null, 'File yang dipilih bukan gambar.'); return; }
@@ -3513,6 +3513,15 @@ function buildAdminSettingsPage(t){
   const formatLabel = t.format==='group_knockout' ? 'Grup + Knockout' : (t.format==='group' ? 'Grup Saja' : 'Knockout Saja');
   panel1.appendChild(h('p', {class:'text-xs muted', style:{marginTop:'16px'}}, 'Format: ' + formatLabel + ' • ' + t.teams.length + ' tim terdaftar • Format tidak dapat diubah setelah turnamen dibuat.'));
 
+  // Indikator ukuran data — logo (turnamen & tim) yang menumpuk bisa mendekati batas
+  // penyimpanan (localStorage browser ~5-10 MB, dokumen Firestore 1 MB). Kalau sudah mepet,
+  // perubahan baru (termasuk logo) bisa gagal tersimpan tanpa terlihat jelas kenapa.
+  const approxKB = Math.round(new Blob([JSON.stringify(t)]).size/1024);
+  const sizeWarn = approxKB > 700;
+  panel1.appendChild(h('p', {class:'text-xs', style:{marginTop:'6px', color: sizeWarn ? 'var(--red)' : 'var(--text-4)'}},
+    'Ukuran data turnamen ini: ~' + approxKB + ' KB' + (sizeWarn ? ' — sudah mendekati batas 1000 KB. Hapus beberapa logo tim yang tidak perlu supaya perubahan baru (termasuk logo turnamen) tetap bisa tersimpan.' : '.')
+  ));
+
   wrap.appendChild(panel1);
 
   if (!t.matchConfig) t.matchConfig = {halfMinutes:10, halves:2};
@@ -4001,7 +4010,12 @@ function saveToLocalStorage(){
       savedAt: savedAt
     }));
     localDataSavedAt = savedAt;
-  } catch(err){ console.error('Gagal menyimpan ke penyimpanan lokal:', err); }
+  } catch(err){
+    // Diam-diam gagal itu berbahaya — kalau ini gagal, perubahan yang baru diketik/upload bisa
+    // hilang lagi pas refresh karena tidak benar-benar tersimpan di mana pun. Munculkan errornya.
+    console.error('Gagal menyimpan ke penyimpanan lokal (kemungkinan data sudah terlalu besar):', err);
+    setFbStatus('error');
+  }
 }
 function loadFromLocalStorage(){
   try{
