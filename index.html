@@ -888,6 +888,7 @@ const state = {
   showAddEvent: null,
   showBracketWinner: null,
   showMatchResult: null,
+  showKlasemenPoster: null,
   selectedTeamId: null,
   liveRunning: true,
   theme: 'dark',
@@ -942,6 +943,7 @@ function buildApp(){
   if (state.showEditPlayer) app.appendChild(buildEditPlayerModal(t));
   if (state.showBracketWinner) app.appendChild(buildBracketWinnerModal(t));
   if (state.showMatchResult) app.appendChild(buildMatchResultModal(t));
+  if (state.showKlasemenPoster) app.appendChild(buildKlasemenPosterModal(t));
   if (state.showAdminLogin) app.appendChild(buildAdminLoginModal());
 
   return app;
@@ -1574,7 +1576,7 @@ let pendingBackgroundRenderSince = 0;
 let pendingSnapshotData = null; // data dari server yang nunggu giliran aman buat diterapkan
 function shouldSkipAutoRender(){
   // Modal terbuka -> jangan render ulang di belakang layar (biar isian di form tidak hilang).
-  if (state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showAddFixtureEvent || state.showBracketWinner || state.showAdminLogin || state.showEditPlayer || state.showMatchResult) return true;
+  if (state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showAddFixtureEvent || state.showBracketWinner || state.showAdminLogin || state.showEditPlayer || state.showMatchResult || state.showKlasemenPoster) return true;
   // Ada input/select/textarea yang sedang fokus (termasuk saat kalender/jam native browser lagi kebuka)
   // -> jangan render ulang, supaya popup-nya tidak ketutup paksa.
   const ae = document.activeElement;
@@ -2046,7 +2048,12 @@ function buildGroupStandings(t){
 
   // -- Kolom kanan: tabel klasemen --
   const tableWrapOuter = h('div', {class:'gs-table-wrap'});
-  tableWrapOuter.appendChild(h('div', {class:'gs-table-head'}, 'Klasemen ' + activeGroup.name));
+  const tableHead = h('div', {class:'gs-table-head', style:{display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', position:'relative'}}, ['Klasemen ' + activeGroup.name]);
+  tableHead.appendChild(h('button', {class:'icon-btn', style:{position:'absolute', right:'8px', color:'#fff'}, title:'Buat gambar Klasemen', onclick:function(){
+    state.showKlasemenPoster = {groupId: activeGroup.id};
+    render();
+  }}, icon('download',14)));
+  tableWrapOuter.appendChild(tableHead);
   const tableInner = h('div', {class:'gs-table-inner table-wrap'});
   const headCells = [h('th',{},'Pos'),h('th',{},'Tim')];
   if (t.groups.length > 0 && groupList.length<=1) headCells.push(h('th',{style:{textAlign:'center'}},'Grup'));
@@ -2415,6 +2422,17 @@ function buildBracketPanel(t){
 
 /* ---------- BRACKET WINNER / PENALTY SHOOTOUT MODAL ---------- */
 /* ---------- MATCH RESULT POSTER (generate gambar hasil pertandingan, bisa didownload) ---------- */
+// Pastikan font Rajdhani (dipakai buat judul poster) sudah benar-benar siap dipakai sebelum
+// mulai menggambar teks — kalau belum, canvas diam-diam jatuh balik ke font default browser.
+let _posterFontsReady = null;
+function ensurePosterFontsReady(){
+  if (_posterFontsReady) return _posterFontsReady;
+  _posterFontsReady = Promise.all([
+    document.fonts.load('700 96px Rajdhani'),
+    document.fonts.load('600 32px Rajdhani'),
+  ]).then(function(){ return document.fonts.ready; }).catch(function(){ /* biarkan lanjut walau gagal preload */ });
+  return _posterFontsReady;
+}
 function loadImgAsync(src){
   return new Promise(function(resolve){
     if (!src){ resolve(null); return; }
@@ -2513,33 +2531,55 @@ function truncateText(ctx, text, maxW){
   while (t.length > 1 && ctx.measureText(t+'…').width > maxW) t = t.slice(0, -1);
   return t + '…';
 }
+// Menghilangkan latar gelap/hitam dari logo yang diupload, supaya di poster cuma keliatan
+// tulisan/gambar logonya doang (transparan), bukan kotak hitam di belakangnya. Pakai teknik
+// chroma-key sederhana: piksel yang gelap banget dibikin transparan penuh, yang agak gelap
+// dibikin transparan sebagian (biar tepinya halus, ga ada garis tegas).
+function removeDarkBackground(img, threshold){
+  threshold = threshold || 38;
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
+  const cx = c.getContext('2d');
+  cx.drawImage(img, 0, 0, c.width, c.height);
+  const data = cx.getImageData(0, 0, c.width, c.height);
+  const px = data.data;
+  const soft = threshold * 2.3;
+  for (let i=0;i<px.length;i+=4){
+    const bright = (px[i]+px[i+1]+px[i+2])/3;
+    if (bright <= threshold) px[i+3] = 0;
+    else if (bright <= soft) px[i+3] = Math.round(px[i+3] * ((bright-threshold)/(soft-threshold)));
+  }
+  cx.putImageData(data, 0, 0);
+  return c;
+}
 async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   const W = 1080;
   const rowH = 128, rowGap = 24;
-  const headerH = 500;
+  const headerH = 560;
   const footerH = 130;
   const H = headerH + matches.length*(rowH+rowGap) + footerH;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
+  await ensurePosterFontsReady();
 
   drawSplatterTexture(ctx, W, H, 42);
 
   const logoImg = await loadImgAsync(t.logoImageUrl);
-  console.log('[Match Result Poster] logoImageUrl tersimpan?', !!t.logoImageUrl, '| berhasil dimuat ke gambar?', !!logoImg);
   ctx.textAlign='center'; ctx.textBaseline='alphabetic';
   let titleY = 90;
   if (logoImg){
-    const lh = 110, lw = lh * (logoImg.naturalWidth/logoImg.naturalHeight || 1);
-    ctx.drawImage(logoImg, W/2-lw/2, 30, lw, lh);
-    titleY = 178;
+    const cleanedLogo = removeDarkBackground(logoImg, 38);
+    const lh = 200, lw = lh * (cleanedLogo.width/cleanedLogo.height || 1);
+    ctx.drawImage(cleanedLogo, W/2-lw/2, 30, lw, lh);
+    titleY = 268;
   } else {
     ctx.fillStyle = '#f5b400';
-    ctx.font = '700 30px Arial, sans-serif';
+    ctx.font = '700 30px Rajdhani, sans-serif';
     ctx.fillText(truncateText(ctx, t.name.toUpperCase(), W-160), W/2, 90);
     titleY = 90;
   }
 
-  ctx.font = '900 96px Arial, sans-serif';
+  ctx.font = '700 96px Rajdhani, sans-serif';
   const partA = 'MATCH ', partB = 'RESULT';
   const wA = ctx.measureText(partA).width, wB = ctx.measureText(partB).width;
   let sx = W/2 - (wA+wB)/2;
@@ -2549,8 +2589,11 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   ctx.fillStyle = '#ffffff'; ctx.fillText(partB, sx+wA, titleBaseY);
   const subtitleY = titleBaseY + 65;
 
-  ctx.textAlign='left'; ctx.font = '800 32px Arial, sans-serif';
-  const gA = 'GROUP ', gB = groupLabel+'  ', gC = '|  ', gD = dateLabel.toUpperCase();
+  ctx.textAlign='left'; ctx.font = '700 32px Rajdhani, sans-serif';
+  // Ambil cuma huruf/kode grupnya aja (mis. "A" dari "Grup A"), bukan nama lengkapnya —
+  // supaya ga dobel sama tulisan "GROUP" yang sudah ada di depannya.
+  const groupLetter = (groupLabel||'').trim().split(/\s+/).pop() || groupLabel;
+  const gA = 'GROUP ', gB = groupLetter.toUpperCase()+'  ', gC = '|  ', gD = dateLabel.toUpperCase();
   const wgA=ctx.measureText(gA).width, wgB=ctx.measureText(gB).width, wgC=ctx.measureText(gC).width, wgD=ctx.measureText(gD).width;
   sx = W/2 - (wgA+wgB+wgC+wgD)/2;
   ctx.fillStyle='#ffffff'; ctx.fillText(gA, sx, subtitleY); sx+=wgA;
@@ -2580,11 +2623,11 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
     const scoreX = W/2 - scoreW/2, scoreY = cy - scoreH/2;
     drawRoundedRect(ctx, scoreX, scoreY, scoreW, scoreH, 10);
     ctx.fillStyle = '#ffffff'; ctx.fill();
-    ctx.fillStyle = '#12224a'; ctx.font='900 58px Arial, sans-serif';
+    ctx.fillStyle = '#12224a'; ctx.font='700 58px Rajdhani, sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(m.scoreA+' - '+m.scoreB, W/2, cy+4);
 
-    ctx.font='800 30px Arial, sans-serif'; ctx.fillStyle='#12224a'; ctx.textBaseline='middle';
+    ctx.font='700 30px Rajdhani, sans-serif'; ctx.fillStyle='#12224a'; ctx.textBaseline='middle';
     const leftTextX = barX+crestR+28, leftMaxW = scoreX-16-leftTextX;
     ctx.textAlign='left';
     ctx.fillText(truncateText(ctx, (m.teamA?m.teamA.name:'Tim Dihapus').toUpperCase(), leftMaxW), leftTextX, cy);
@@ -2595,10 +2638,10 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
     y += barH+rowGap;
   });
 
-  ctx.textAlign='center'; ctx.font='600 24px Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
+  ctx.textAlign='center'; ctx.font='600 24px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
   if (t.igHandle){
     const igText = t.igHandle.replace(/^@/,'');
-    ctx.font='600 26px Arial, sans-serif';
+    ctx.font='600 26px Rajdhani, sans-serif';
     const igW = ctx.measureText(igText).width;
     const iconSize = 30, gap = 10;
     const totalW = iconSize+gap+igW;
@@ -2617,6 +2660,202 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   }
 }
 
+/* ---------- KLASEMEN GRUP POSTER (gambar tabel klasemen, gaya sama dengan Match Result) ---------- */
+async function drawKlasemenPoster(t, canvas, groupLabel, teams){
+  const W = 1080;
+  const rowH = 84, headHeight = 70;
+  const headerH = 560;
+  const footerH = 110;
+  const H = headerH + headHeight + teams.length*rowH + footerH;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  await ensurePosterFontsReady();
+
+  drawSplatterTexture(ctx, W, H, 77);
+
+  const logoImg = await loadImgAsync(t.logoImageUrl);
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  let titleY = 90;
+  if (logoImg){
+    const cleanedLogo = removeDarkBackground(logoImg, 38);
+    const lh = 200, lw = lh * (cleanedLogo.width/cleanedLogo.height || 1);
+    ctx.drawImage(cleanedLogo, W/2-lw/2, 30, lw, lh);
+    titleY = 268;
+  } else {
+    ctx.fillStyle = '#f5b400';
+    ctx.font = '700 30px Rajdhani, sans-serif';
+    ctx.fillText(truncateText(ctx, t.name.toUpperCase(), W-160), W/2, 90);
+    titleY = 90;
+  }
+
+  ctx.font = '700 92px Rajdhani, sans-serif';
+  const partA = 'KLASEMEN ', partB = 'GRUP';
+  const wA = ctx.measureText(partA).width, wB = ctx.measureText(partB).width;
+  let sx = W/2 - (wA+wB)/2;
+  const titleBaseY = titleY + 125;
+  ctx.textAlign='left';
+  ctx.fillStyle = '#f5c518'; ctx.fillText(partA, sx, titleBaseY);
+  ctx.fillStyle = '#ffffff'; ctx.fillText(partB, sx+wA, titleBaseY);
+  const subtitleY = titleBaseY + 65;
+
+  ctx.font = '700 32px Rajdhani, sans-serif';
+  const groupLetter = (groupLabel||'').trim().split(/\s+/).pop() || groupLabel;
+  const gA = 'GROUP ', gB = groupLetter.toUpperCase();
+  const wgA=ctx.measureText(gA).width, wgB=ctx.measureText(gB).width;
+  sx = W/2 - (wgA+wgB)/2;
+  ctx.fillStyle='#ffffff'; ctx.fillText(gA, sx, subtitleY); sx+=wgA;
+  ctx.fillStyle='#f97316'; ctx.fillText(gB, sx, subtitleY);
+
+  const crestImgs = await Promise.all(teams.map(function(tm){ return loadImgAsync(tm.logoUrl); }));
+
+  const tableX = 90, tableW = W-180;
+  let y = headerH;
+  // header tabel
+  drawRoundedRect(ctx, tableX, y, tableW, headHeight, 10);
+  const headGrad = ctx.createLinearGradient(tableX,y,tableX+tableW,y);
+  headGrad.addColorStop(0,'#1e3a8a'); headGrad.addColorStop(1,'#0f172a');
+  ctx.fillStyle = headGrad; ctx.fill();
+  const cols = [
+    {key:'pos', label:'POS', w:0.09}, {key:'team', label:'TIM', w:0.34},
+    {key:'m', label:'M', w:0.09}, {key:'w', label:'M', w:0.08}, {key:'d', label:'S', w:0.08},
+    {key:'l', label:'K', w:0.08}, {key:'gd', label:'SG', w:0.10}, {key:'pt', label:'POIN', w:0.14}
+  ];
+  let cx = tableX;
+  const colX = {};
+  cols.forEach(function(c){ colX[c.key]=cx; cx += tableW*c.w; });
+  ctx.font = '600 22px Rajdhani, sans-serif'; ctx.fillStyle = '#ffffff'; ctx.textBaseline='middle';
+  cols.forEach(function(c){
+    ctx.textAlign = (c.key==='team') ? 'left' : 'center';
+    const tx = c.key==='team' ? colX[c.key]+70 : colX[c.key]+(tableW*c.w)/2;
+    ctx.fillText(c.label, tx, y+headHeight/2);
+  });
+  y += headHeight;
+
+  teams.forEach(function(tm, i){
+    const rowY = y, isTop = i===0;
+    if (isTop){
+      ctx.fillStyle = 'rgba(245,180,0,.14)'; ctx.fillRect(tableX, rowY, tableW, rowH);
+    } else if (i%2===1){
+      ctx.fillStyle = 'rgba(255,255,255,.035)'; ctx.fillRect(tableX, rowY, tableW, rowH);
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(tableX, rowY+rowH); ctx.lineTo(tableX+tableW, rowY+rowH); ctx.stroke();
+
+    const rcy = rowY+rowH/2;
+    // posisi (badge bulat)
+    const badgeR = 20, badgeCx = colX.pos+(tableW*0.09)/2;
+    ctx.beginPath(); ctx.arc(badgeCx, rcy, badgeR, 0, Math.PI*2);
+    if (i===0){ const g=ctx.createLinearGradient(badgeCx-badgeR,rcy,badgeCx+badgeR,rcy); g.addColorStop(0,'#f5b400'); g.addColorStop(1,'#b45309'); ctx.fillStyle=g; }
+    else if (i===1){ const g=ctx.createLinearGradient(badgeCx-badgeR,rcy,badgeCx+badgeR,rcy); g.addColorStop(0,'#e2e8f0'); g.addColorStop(1,'#94a3b8'); ctx.fillStyle=g; }
+    else if (i===2){ const g=ctx.createLinearGradient(badgeCx-badgeR,rcy,badgeCx+badgeR,rcy); g.addColorStop(0,'#d97706'); g.addColorStop(1,'#78350f'); ctx.fillStyle=g; }
+    else { ctx.fillStyle = 'rgba(255,255,255,.12)'; }
+    ctx.fill();
+    ctx.fillStyle = (i<3) ? '#1c1207' : '#ffffff';
+    ctx.font='700 22px Rajdhani, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(String(i+1), badgeCx, rcy+1);
+
+    // crest + nama tim
+    const crestR = 22, crestCx = colX.team+34;
+    drawCrest(ctx, crestImgs[i], tm, crestCx, rcy, crestR);
+    ctx.font='700 25px Rajdhani, sans-serif'; ctx.fillStyle='#ffffff'; ctx.textAlign='left';
+    const nameMaxW = tableW*0.34 - 70;
+    ctx.fillText(truncateText(ctx, tm.name.toUpperCase(), nameMaxW), colX.team+68, rcy+1);
+
+    // statistik
+    ctx.font='600 24px Rajdhani, sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle='rgba(255,255,255,.85)';
+    ctx.fillText(String(tm.stats.played||0), colX.m+(tableW*0.09)/2, rcy+1);
+    ctx.fillText(String(tm.stats.win||0), colX.w+(tableW*0.08)/2, rcy+1);
+    ctx.fillText(String(tm.stats.draw||0), colX.d+(tableW*0.08)/2, rcy+1);
+    ctx.fillText(String(tm.stats.lose||0), colX.l+(tableW*0.08)/2, rcy+1);
+    const gd = tm.stats.gd||0;
+    ctx.fillStyle = gd>=0 ? '#4ade80' : '#f87171';
+    ctx.fillText((gd>0?'+':'')+gd, colX.gd+(tableW*0.10)/2, rcy+1);
+    ctx.font='700 26px Rajdhani, sans-serif'; ctx.fillStyle='#f5c518';
+    ctx.fillText(String(tm.stats.pts||0), colX.pt+(tableW*0.14)/2, rcy+1);
+
+    y += rowH;
+  });
+
+  ctx.textAlign='center'; ctx.font='600 24px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
+  if (t.igHandle){
+    const igText = t.igHandle.replace(/^@/,'');
+    ctx.font='600 26px Rajdhani, sans-serif';
+    const igW = ctx.measureText(igText).width;
+    const iconSize = 30, gap = 10;
+    const totalW = iconSize+gap+igW;
+    const iconX = W/2 - totalW/2, iconY = H-58;
+    drawRoundedRect(ctx, iconX, iconY, iconSize, iconSize, 8);
+    ctx.strokeStyle='rgba(255,255,255,.65)'; ctx.lineWidth=2.2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(iconX+iconSize/2, iconY+iconSize/2, iconSize*0.26, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(iconX+iconSize*0.74, iconY+iconSize*0.26, 2, 0, Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,.65)'; ctx.fill();
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText(igText, iconX+iconSize+gap, iconY+iconSize/2+1);
+  } else {
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillText(t.name, W/2, H-40);
+  }
+}
+
+function buildKlasemenPosterModal(t){
+  const cfg = state.showKlasemenPoster;
+  const groupList = t.groups.length ? t.groups : [{id:null, name:'Semua Tim'}];
+  if (!groupList.find(function(g){return g.id===cfg.groupId;})) cfg.groupId = groupList[0].id;
+
+  const overlay = h('div', {class:'modal-overlay', onclick:function(e){ if(e.target===overlay){ state.showKlasemenPoster=null; render(); } }});
+  const box = h('div', {class:'modal-box', style:{maxWidth:'560px'}});
+  box.appendChild(h('div', {class:'modal-head'}, [h('h3',{},'Buat Gambar Klasemen'), h('button',{class:'modal-close', onclick:function(){ state.showKlasemenPoster=null; render(); }}, icon('x',20))]));
+
+  const body = h('div', {class:'flex-col gap-4'});
+  const groupWrap = h('div', {});
+  groupWrap.appendChild(h('label',{class:'form-label'},'Grup'));
+  const groupSel = h('select', {class:'form-input'}, groupList.map(function(g){ return h('option',{value:g.id}, g.name); }));
+  groupSel.value = cfg.groupId;
+  groupSel.addEventListener('change', function(e){ cfg.groupId = e.target.value==='null'?null:e.target.value; genPreview(); });
+  groupWrap.appendChild(groupSel);
+  body.appendChild(groupWrap);
+
+  const previewWrap = h('div', {style:{textAlign:'center', background:'var(--surface-2)', borderRadius:'10px', padding:'10px', minHeight:'120px', display:'flex', alignItems:'center', justifyContent:'center'}});
+  const statusMsg = h('p', {class:'text-xs muted', style:{margin:'0', textAlign:'center'}}, 'Memuat pratinjau…');
+  body.appendChild(previewWrap);
+  body.appendChild(statusMsg);
+  const downloadBtn = h('button', {class:'btn btn-primary w-full', style:{padding:'12px'}, disabled:true}, [icon('download',16), 'Download Gambar (PNG)']);
+  body.appendChild(downloadBtn);
+
+  let currentCanvas = null;
+  function genPreview(){
+    const teams = t.teams.filter(function(tm){ return groupList.length<=1 || tm.groupId===cfg.groupId; })
+      .sort(function(a,b){ return b.stats.pts-a.stats.pts || b.stats.gd-a.stats.gd || (b.stats.gf||0)-(a.stats.gf||0); });
+    if (teams.length===0){
+      previewWrap.innerHTML=''; statusMsg.textContent='Belum ada tim di grup ini.'; downloadBtn.disabled=true; return;
+    }
+    statusMsg.textContent = 'Memuat pratinjau…';
+    const groupName = (t.groups.find(function(g){return g.id===cfg.groupId;})||{}).name || 'SEMUA TIM';
+    const canvas = document.createElement('canvas');
+    drawKlasemenPoster(t, canvas, groupName, teams).then(function(){
+      currentCanvas = canvas;
+      previewWrap.innerHTML = '';
+      previewWrap.appendChild(h('img', {src:canvas.toDataURL('image/png'), style:{maxWidth:'100%', borderRadius:'8px', display:'block', margin:'0 auto'}}));
+      statusMsg.textContent = teams.length + ' tim • siap didownload';
+      downloadBtn.disabled = false;
+    }).catch(function(err){ console.error('Gagal membuat poster klasemen:', err); statusMsg.textContent='Gagal membuat pratinjau.'; });
+  }
+  downloadBtn.addEventListener('click', function(){
+    if (!currentCanvas) return;
+    const a = document.createElement('a');
+    a.download = 'klasemen-' + (state.showKlasemenPoster.groupId||'semua') + '.png';
+    a.href = currentCanvas.toDataURL('image/png');
+    a.click();
+  });
+  genPreview();
+
+  box.appendChild(body);
+  overlay.appendChild(box);
+  return overlay;
+}
+
 function buildMatchResultModal(t){
   const cfg = state.showMatchResult;
   const groupList = t.groups.length ? t.groups : [{id:null, name:'Semua Tim'}];
@@ -2624,9 +2863,17 @@ function buildMatchResultModal(t){
 
   function groupIdOfTeam(teamId){ const tm=t.teams.find(function(x){return x.id===teamId;}); return tm ? tm.groupId : undefined; }
   function matchesForGroup(gid){
-    return t.schedule.filter(function(s){
+    const list = t.schedule.filter(function(s){
       return s.status==='finished' && groupIdOfTeam(s.teamAId)===gid && groupIdOfTeam(s.teamBId)===gid;
     }).sort(function(a,b){ return fixtureSortKey(a)-fixtureSortKey(b); });
+    // Jaga-jaga kalau ada jadwal yang ke-duplikat di data (mis. efek samping sinkronisasi lama) —
+    // pertandingan dengan tim, tanggal, jam, dan skor yang sama persis cuma dihitung sekali.
+    const seen = {}; const dedup = [];
+    list.forEach(function(s){
+      const key = s.teamAId+'|'+s.teamBId+'|'+s.date+'|'+s.time+'|'+s.scoreA+'|'+s.scoreB;
+      if (!seen[key]){ seen[key]=true; dedup.push(s); }
+    });
+    return dedup;
   }
 
   const overlay = h('div', {class:'modal-overlay', onclick:function(e){ if(e.target===overlay){ state.showMatchResult=null; render(); } }});
@@ -3089,7 +3336,19 @@ function buildFixturesPage(t){
   }
 
   const panel2 = h('div', {class:'panel'});
-  panel2.appendChild(sectionTitle('calendar', 'Semua Jadwal Pertandingan'));
+  const cleanupBtn = state.adminMode ? h('button', {class:'btn btn-ghost-red', style:{fontSize:'11px', padding:'6px 10px'}, onclick:function(){
+    const seen = {}; const dedupSchedule = [];
+    t.schedule.forEach(function(s){
+      const key = s.teamAId+'|'+s.teamBId+'|'+s.date+'|'+s.time+'|'+s.status+'|'+s.scoreA+'|'+s.scoreB;
+      if (!seen[key]){ seen[key]=true; dedupSchedule.push(s); }
+    });
+    const removed = t.schedule.length - dedupSchedule.length;
+    if (removed===0){ alert('Tidak ada jadwal duplikat ditemukan.'); return; }
+    if (!confirm('Ditemukan ' + removed + ' jadwal duplikat (tim, tanggal, jam, dan skor sama persis). Hapus yang dobel?')) return;
+    t.schedule = dedupSchedule;
+    render();
+  }}, [icon('trash',12), 'Bersihkan Jadwal Duplikat']) : null;
+  panel2.appendChild(sectionTitle('calendar', 'Semua Jadwal Pertandingan', cleanupBtn));
   const teamName = function(id){ const f=t.teams.find(function(x){return x.id===id;}); return f?f.name:'Tim Dihapus'; };
 
   t.schedule.forEach(function(s){
