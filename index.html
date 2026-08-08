@@ -3759,6 +3759,8 @@ function loadFromLocalStorage(){
   } catch(err){ console.error('Gagal memuat dari penyimpanan lokal:', err); return false; }
 }
 let fbWritePending = false; // true dari saat ada perubahan lokal sampai tulisannya benar-benar sampai ke server
+let fbWriteInFlight = false; // true selama satu tulisan sedang dikirim & menunggu balasan server
+let fbWriteQueued = false;   // ada perubahan baru yang masuk SELAGI tulisan sebelumnya masih diproses
 function scheduleSave(){
   // Selalu simpan ke localStorage browser ini, apa pun status Firebase-nya.
   saveToLocalStorage();
@@ -3768,22 +3770,36 @@ function scheduleSave(){
   setFbStatus('saving');
   fbWritePending = true; // sejak sekarang sampai tulisan ini sukses, abaikan snapshot masuk yang lebih lama
   clearTimeout(fbSaveTimer);
-  fbSaveTimer = setTimeout(function(){
-    const payload = fbSnapshotData();
-    // Firestore membatasi 1 MB per dokumen. Kalau kelewat (biasanya karena logo
-    // terlalu besar), tulisannya akan ditolak — beri tahu, jangan gagal diam-diam.
-    const approxBytes = new Blob([JSON.stringify(payload)]).size;
-    if (approxBytes > 900000){
-      setFbStatus('error');
-      fbWritePending = false;
-      console.error('Data terlalu besar untuk Firestore:', approxBytes, 'byte (batas 1 MB).');
-      alert('Data turnamen sudah terlalu besar (' + Math.round(approxBytes/1024) + ' KB, batas 1 MB) sehingga gagal disimpan ke cloud.\n\nBiasanya ini karena terlalu banyak logo tim. Coba hapus beberapa logo yang tidak terpakai. Data tetap tersimpan di browser ini.');
-      return;
-    }
-    fbDb.collection(FB_COLLECTION).doc(FB_DOC).set(payload)
-      .then(function(){ setFbStatus('synced'); fbWritePending = false; })
-      .catch(function(err){ console.error('Gagal menyimpan ke Firebase:', err); setFbStatus('error'); fbWritePending = false; });
-  }, 700);
+  fbSaveTimer = setTimeout(performFirestoreWrite, 700);
+}
+// Mengirim SATU tulisan ke Firestore. Kalau masih ada tulisan sebelumnya yang belum dibalas
+// server (koneksi lambat, dsb), JANGAN kirim tulisan baru yang tumpang tindih — itu yang
+// bikin antrian Firestore penuh ("Write stream exhausted maximum allowed queued writes") dan
+// beberapa perubahan (mis. upload logo) gagal tersimpan. Cukup tandai "ada susulan", dan
+// begitu tulisan yang sedang jalan selesai, kirim SEKALI LAGI dengan data paling baru.
+function performFirestoreWrite(){
+  if (fbWriteInFlight){ fbWriteQueued = true; return; }
+  const payload = fbSnapshotData();
+  // Firestore membatasi 1 MB per dokumen. Kalau kelewat (biasanya karena logo
+  // terlalu besar), tulisannya akan ditolak — beri tahu, jangan gagal diam-diam.
+  const approxBytes = new Blob([JSON.stringify(payload)]).size;
+  if (approxBytes > 900000){
+    setFbStatus('error');
+    fbWritePending = false;
+    console.error('Data terlalu besar untuk Firestore:', approxBytes, 'byte (batas 1 MB).');
+    alert('Data turnamen sudah terlalu besar (' + Math.round(approxBytes/1024) + ' KB, batas 1 MB) sehingga gagal disimpan ke cloud.\n\nBiasanya ini karena terlalu banyak logo tim. Coba hapus beberapa logo yang tidak terpakai. Data tetap tersimpan di browser ini.');
+    return;
+  }
+  fbWriteInFlight = true;
+  fbDb.collection(FB_COLLECTION).doc(FB_DOC).set(payload)
+    .then(function(){
+      setFbStatus('synced'); fbWritePending = false; fbWriteInFlight = false;
+      if (fbWriteQueued){ fbWriteQueued = false; performFirestoreWrite(); }
+    })
+    .catch(function(err){
+      console.error('Gagal menyimpan ke Firebase:', err); setFbStatus('error'); fbWritePending = false; fbWriteInFlight = false;
+      if (fbWriteQueued){ fbWriteQueued = false; performFirestoreWrite(); }
+    });
 }
 function initFirebase(){
   if (!FIREBASE_ENABLED){ render(); ensureLiveTimer(); return; }
