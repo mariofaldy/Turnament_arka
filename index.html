@@ -1258,11 +1258,24 @@ function editableText(getVal, setVal, className){
     return h('span', {class: className}, getVal());
   }
   const input = h('input', {type:'text', class:'inline-edit ' + className, value: getVal()});
-  function commit(){
+  let inputTimer = null;
+  function silentCommit(){
+    // Simpan nilainya ke data TANPA render ulang — supaya kalau user buru-buru klik ke kolom
+    // lain (sebelum blur/change sempat kepicu dengan bersih), nilai yang baru diketik tetap
+    // sudah tersimpan di data, bukan hilang karena render() keburu menghancurkan field ini
+    // di tengah proses perpindahan fokus browser.
     const v = input.value.trim()===''? getVal() : input.value;
-    if (v !== getVal()){ setVal(v); render(); }
+    if (v !== getVal()){ setVal(v); scheduleSave(); }
   }
-  input.addEventListener('change', commit);
+  function commit(){
+    silentCommit();
+    render();
+  }
+  input.addEventListener('input', function(){
+    clearTimeout(inputTimer);
+    inputTimer = setTimeout(silentCommit, 400);
+  });
+  input.addEventListener('change', function(){ clearTimeout(inputTimer); commit(); });
   input.addEventListener('keydown', function(e){ if (e.key==='Enter') input.blur(); });
   input.addEventListener('click', function(e){ e.stopPropagation(); });
   return input;
@@ -1273,11 +1286,23 @@ function editableNumber(getVal, setVal, className, opts){
     return h('span', {class: className}, String(getVal()));
   }
   const input = h('input', {type:'number', class:'inline-edit-num ' + className, value: getVal()});
-  function commit(){
-    let v = parseInt(input.value,10); if (isNaN(v)) v = getVal(); v = Math.max(min, v);
-    if (v !== getVal()){ setVal(v); render(); }
+  let inputTimer = null;
+  function parsedValue(){
+    let v = parseInt(input.value,10); if (isNaN(v)) v = getVal(); return Math.max(min, v);
   }
-  input.addEventListener('change', commit);
+  function silentCommit(){
+    const v = parsedValue();
+    if (v !== getVal()){ setVal(v); scheduleSave(); }
+  }
+  function commit(){
+    silentCommit();
+    render();
+  }
+  input.addEventListener('input', function(){
+    clearTimeout(inputTimer);
+    inputTimer = setTimeout(silentCommit, 400);
+  });
+  input.addEventListener('change', function(){ clearTimeout(inputTimer); commit(); });
   input.addEventListener('keydown', function(e){ if (e.key==='Enter') input.blur(); });
   input.addEventListener('click', function(e){ e.stopPropagation(); });
   return input;
