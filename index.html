@@ -626,6 +626,22 @@ function fixtureSortKey(s){
   }
   return 0; // tanggal tak dikenali (mis. "Pertandingan Live") -> taruh paling awal, jangan sampai error
 }
+// Konversi antara format tampilan ("18 Jul 2026") dan format <input type="date"> ("2026-07-18").
+// Dipakai di form tambah jadwal maupun edit tanggal/jam jadwal yang sudah ada.
+var DATE_MONTHS_DISPLAY = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+function dateToDisplay(isoStr){
+  if (!isoStr) return '';
+  var p = isoStr.split('-'); if(p.length!==3) return isoStr;
+  var d = parseInt(p[2],10), m = parseInt(p[1],10)-1, y = p[0];
+  return d + ' ' + (DATE_MONTHS_DISPLAY[m]||'') + ' ' + y;
+}
+function displayToIso(displayStr){
+  if (!displayStr) return '';
+  var p = displayStr.split(' '); if(p.length!==3) return '';
+  var d = parseInt(p[0],10), mIdx = DATE_MONTHS_DISPLAY.indexOf(p[1]), y = p[2];
+  if (mIdx===-1 || isNaN(d)) return '';
+  return y + '-' + String(mIdx+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+}
 
 const TEAM_EMOJIS = ["⚽","🦁","🐉","🦅","🐺","🔥","🛡️","👑","🌟","🦂","🐯","🦈","🐗","🦇","🐅","🦍"];
 const TEAM_COLORS = ["grad-blue","grad-purple","grad-emerald","grad-orange","grad-pink","grad-cyan","grad-red","grad-yellow","grad-indigo","grad-teal"];
@@ -2765,20 +2781,6 @@ function buildFixturesPage(t){
     selA.value = fixtureForm.teamAId; selA.addEventListener('change', function(e){ fixtureForm.teamAId=e.target.value; });
     const selB = h('select', {class:'form-input'}, t.teams.map(function(tm){ return h('option',{value:tm.id}, tm.name); }));
     selB.value = fixtureForm.teamBId; selB.addEventListener('change', function(e){ fixtureForm.teamBId=e.target.value; });
-    var dateMonths = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-    function dateToDisplay(isoStr){
-      if (!isoStr) return '';
-      var p = isoStr.split('-'); if(p.length!==3) return isoStr;
-      var d = parseInt(p[2],10), m = parseInt(p[1],10)-1, y = p[0];
-      return d + ' ' + (dateMonths[m]||'') + ' ' + y;
-    }
-    function displayToIso(displayStr){
-      if (!displayStr) return '';
-      var p = displayStr.split(' '); if(p.length!==3) return '';
-      var d = parseInt(p[0],10), mIdx = dateMonths.indexOf(p[1]), y = p[2];
-      if (mIdx===-1 || isNaN(d)) return '';
-      return y + '-' + String(mIdx+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-    }
     var dateIsoVal = displayToIso(fixtureForm.date);
     const dateInp = h('input', {type:'date', class:'form-input', value:dateIsoVal});
     dateInp.addEventListener('change', function(e){ fixtureForm.date = dateToDisplay(e.target.value); });
@@ -2810,7 +2812,17 @@ function buildFixturesPage(t){
     }
     nameRow.appendChild(h('span', {class:'font-semibold truncate'}, teamName(s.teamBId)));
     infoBlock.appendChild(nameRow);
-    infoBlock.appendChild(h('div', {class:'text-xs muted', style:{marginTop:'4px'}}, s.date+' • '+s.time));
+    if (state.adminMode){
+      const editRow = h('div', {class:'flex items-center gap-1', style:{marginTop:'4px'}});
+      const dEdit = h('input', {type:'date', class:'form-input', style:{padding:'3px 6px', fontSize:'11px', width:'auto'}, value:displayToIso(s.date)});
+      dEdit.addEventListener('change', function(e){ s.date = dateToDisplay(e.target.value); render(); });
+      const tEdit = h('input', {type:'time', class:'form-input', style:{padding:'3px 6px', fontSize:'11px', width:'auto'}, value:s.time});
+      tEdit.addEventListener('change', function(e){ s.time = e.target.value; render(); });
+      editRow.appendChild(dEdit); editRow.appendChild(tEdit);
+      infoBlock.appendChild(editRow);
+    } else {
+      infoBlock.appendChild(h('div', {class:'text-xs muted', style:{marginTop:'4px'}}, s.date+' • '+s.time));
+    }
 
     const badge = h('span', {class:'status-pill ' + (s.status==='live'?'status-live':(s.status==='finished'?'status-finished':'status-upcoming'))}, s.status==='live'?'LIVE':(s.status==='finished'?'Selesai':'Mendatang'));
 
