@@ -2525,6 +2525,7 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   drawSplatterTexture(ctx, W, H, 42);
 
   const logoImg = await loadImgAsync(t.logoImageUrl);
+  console.log('[Match Result Poster] logoImageUrl tersimpan?', !!t.logoImageUrl, '| berhasil dimuat ke gambar?', !!logoImg);
   ctx.textAlign='center'; ctx.textBaseline='alphabetic';
   let titleY = 90;
   if (logoImg){
@@ -2596,7 +2597,7 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
 
   ctx.textAlign='center'; ctx.font='600 24px Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
   if (t.igHandle){
-    const igText = '@'+t.igHandle.replace(/^@/,'');
+    const igText = t.igHandle.replace(/^@/,'');
     ctx.font='600 26px Arial, sans-serif';
     const igW = ctx.measureText(igText).width;
     const iconSize = 30, gap = 10;
