@@ -1337,16 +1337,19 @@ const LOGO_MAX_PX = 220;      // sisi terpanjang logo setelah di-resize
 const LOGO_QUALITY = 0.76;    // kualitas JPEG (0-1)
 
 function compressImageFile(file, cb){
-  if (!file || !/^image\//.test(file.type)){ cb(null, 'File yang dipilih bukan gambar.'); return; }
+  console.log('[compressImageFile] mulai. File:', file && file.name, file && file.type, file && Math.round((file.size||0)/1024)+'KB');
+  if (!file || !/^image\//.test(file.type)){ console.warn('[compressImageFile] ditolak: bukan file gambar'); cb(null, 'File yang dipilih bukan gambar.'); return; }
   const reader = new FileReader();
-  reader.onerror = function(){ cb(null, 'Gagal membaca file gambar.'); };
+  reader.onerror = function(err){ console.error('[compressImageFile] FileReader error:', err); cb(null, 'Gagal membaca file gambar.'); };
   reader.onload = function(ev){
+    console.log('[compressImageFile] FileReader selesai, ukuran data URI:', Math.round((ev.target.result||'').length/1024)+'KB');
     const img = new Image();
-    img.onerror = function(){ cb(null, 'Format gambar tidak didukung browser.'); };
+    img.onerror = function(err){ console.error('[compressImageFile] Image gagal dimuat:', err); cb(null, 'Format gambar tidak didukung browser.'); };
     img.onload = function(){
+      console.log('[compressImageFile] Image dimuat, dimensi asli:', img.naturalWidth+'x'+img.naturalHeight);
       let w = img.naturalWidth || img.width;
       let h = img.naturalHeight || img.height;
-      if (!w || !h){ cb(null, 'Ukuran gambar tidak terbaca.'); return; }
+      if (!w || !h){ console.warn('[compressImageFile] dimensi tidak terbaca'); cb(null, 'Ukuran gambar tidak terbaca.'); return; }
       const scale = Math.min(1, LOGO_MAX_PX / Math.max(w, h));
       w = Math.max(1, Math.round(w * scale));
       h = Math.max(1, Math.round(h * scale));
@@ -1358,9 +1361,11 @@ function compressImageFile(file, cb){
       ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
       try{
-        cb(canvas.toDataURL('image/jpeg', LOGO_QUALITY), null);
+        const out = canvas.toDataURL('image/jpeg', LOGO_QUALITY);
+        console.log('[compressImageFile] SUKSES. Hasil kompres:', w+'x'+h, Math.round(out.length/1024)+'KB');
+        cb(out, null);
       } catch(err){
-        console.error('Gagal mengompres gambar:', err);
+        console.error('[compressImageFile] Gagal mengompres gambar (toDataURL error):', err);
         cb(null, 'Gagal memproses gambar.');
       }
     };
@@ -1381,9 +1386,11 @@ function pickImageFile(onPicked){
     document.body.appendChild(sharedFileInput);
   }
   sharedFileInput.onchange = function(e){
+    console.log('[pickImageFile] file dipilih:', e.target.files && e.target.files.length, 'file(s)');
     const file = e.target.files && e.target.files[0];
     sharedFileInput.value = ''; // reset supaya file yang sama bisa dipilih lagi
     if (file) onPicked(file);
+    else console.warn('[pickImageFile] tidak ada file terpilih');
   };
   sharedFileInput.click();
 }
@@ -3472,11 +3479,14 @@ function buildAdminSettingsPage(t){
   logoPreviewRow.appendChild(logoPreview);
   const logoUploadBtn = h('button', {class:'btn btn-ghost-blue', type:'button', onclick:function(e){
     e.preventDefault(); e.stopPropagation();
+    console.log('[Logo Turnamen] tombol diklik, membuka pemilih file...');
     pickImageFile(function(file){
       compressImageFile(file, function(dataUrl, errMsg){
-        if (!dataUrl){ alert(errMsg || 'Gagal memuat logo.'); return; }
+        if (!dataUrl){ console.error('[Logo Turnamen] gagal:', errMsg); alert(errMsg || 'Gagal memuat logo.'); return; }
+        console.log('[Logo Turnamen] berhasil dikompres, menyimpan ke t.logoImageUrl dan render ulang...');
         t.logoImageUrl = dataUrl;
         render();
+        console.log('[Logo Turnamen] render selesai. t.logoImageUrl sekarang:', !!t.logoImageUrl);
       });
     });
   }}, [icon('camera',13), t.logoImageUrl ? 'Ganti Logo' : 'Upload Logo']);
