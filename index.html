@@ -4060,6 +4060,7 @@ function scheduleSave(){
 // bikin antrian Firestore penuh ("Write stream exhausted maximum allowed queued writes") dan
 // beberapa perubahan (mis. upload logo) gagal tersimpan. Cukup tandai "ada susulan", dan
 // begitu tulisan yang sedang jalan selesai, kirim SEKALI LAGI dengan data paling baru.
+let fbBackoffMs = 0; // jeda tambahan sebelum coba lagi setelah gagal — naik tiap gagal berturut-turut
 function performFirestoreWrite(){
   if (fbWriteInFlight){ fbWriteQueued = true; return; }
   const payload = fbSnapshotData();
@@ -4077,11 +4078,26 @@ function performFirestoreWrite(){
   fbDb.collection(FB_COLLECTION).doc(FB_DOC).set(payload)
     .then(function(){
       setFbStatus('synced'); fbWritePending = false; fbWriteInFlight = false;
+      fbBackoffMs = 0; // sukses -> reset, tulisan berikutnya boleh langsung coba lagi
       if (fbWriteQueued){ fbWriteQueued = false; performFirestoreWrite(); }
     })
     .catch(function(err){
       console.error('Gagal menyimpan ke Firebase:', err); setFbStatus('error'); fbWritePending = false; fbWriteInFlight = false;
-      if (fbWriteQueued){ fbWriteQueued = false; performFirestoreWrite(); }
+      // JANGAN langsung coba lagi begitu gagal — itu yang justru bikin antrian Firestore makin
+      // penuh kalau penyebabnya server/koneksi lagi kewalahan ("resource-exhausted"). Tunggu
+      // dulu dengan jeda yang makin lama tiap gagal berturut-turut (max 30 detik), baru coba lagi.
+      const isOverloaded = err && err.code === 'resource-exhausted';
+      fbBackoffMs = isOverloaded ? Math.min(30000, (fbBackoffMs||2000)*2) : 0;
+      if (isOverloaded || fbWriteQueued){
+        fbWriteQueued = false;
+        fbWritePending = true; // masih ada yang belum benar-benar tersimpan — jangan biarkan snapshot lama menimpa
+        if (fbBackoffMs > 0){
+          console.warn('Menunda percobaan kirim ulang selama', Math.round(fbBackoffMs/1000)+'s karena server sedang kewalahan.');
+          setTimeout(performFirestoreWrite, fbBackoffMs);
+        } else {
+          performFirestoreWrite();
+        }
+      }
     });
 }
 function initFirebase(){
