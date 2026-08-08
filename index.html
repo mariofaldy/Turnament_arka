@@ -1581,9 +1581,12 @@ function ensureLiveTimer(){
 let pendingBackgroundRender = false;
 let pendingBackgroundRenderSince = 0;
 let pendingSnapshotData = null; // data dari server yang nunggu giliran aman buat diterapkan
+function isModalOpen(){
+  return !!(state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showAddFixtureEvent || state.showBracketWinner || state.showAdminLogin || state.showEditPlayer || state.showMatchResult || state.showKlasemenPoster);
+}
 function shouldSkipAutoRender(){
   // Modal terbuka -> jangan render ulang di belakang layar (biar isian di form tidak hilang).
-  if (state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showAddFixtureEvent || state.showBracketWinner || state.showAdminLogin || state.showEditPlayer || state.showMatchResult || state.showKlasemenPoster) return true;
+  if (isModalOpen()) return true;
   // Ada input/select/textarea yang sedang fokus (termasuk saat kalender/jam native browser lagi kebuka)
   // -> jangan render ulang, supaya popup-nya tidak ketutup paksa.
   const ae = document.activeElement;
@@ -1625,9 +1628,11 @@ setInterval(function(){
   if (!pendingBackgroundRender) return;
   // Kalau field yang lagi fokus dibiarkan berlarut-larut (mis. kursor ketinggalan di suatu
   // kolom tanpa pernah diklik lagi), update dari device lain bisa numpuk tak terlihat tanpa
-  // batas waktu. Setelah 12 detik, paksa tampilkan update terbaru — lebih baik daripada
-  // layar yang ketinggalan jauh dari data sebenarnya.
-  const stuckTooLong = pendingBackgroundRenderSince && (Date.now() - pendingBackgroundRenderSince > 12000);
+  // batas waktu. Setelah 12 detik, paksa tampilkan update terbaru. TAPI kalau yang lagi
+  // terbuka itu MODAL (mis. form login admin, form tambah gol) — jangan pernah dipaksa,
+  // walau sudah lebih dari 12 detik, karena itu memutus form yang sedang aktif diisi user
+  // (dulu ini bug: form login ketutup paksa tiap ~12 detik kalau isi email/password lama).
+  const stuckTooLong = pendingBackgroundRenderSince && (Date.now() - pendingBackgroundRenderSince > 12000) && !isModalOpen();
   if (!shouldSkipAutoRender() || stuckTooLong){
     pendingBackgroundRender = false;
     if (pendingSnapshotData){
