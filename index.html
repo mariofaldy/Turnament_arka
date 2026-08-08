@@ -1528,6 +1528,7 @@ function ensureLiveTimer(){
    kalender/jam yang lagi kebuka, dropdown, atau input yang lagi diketik ---------- */
 let pendingBackgroundRender = false;
 let pendingBackgroundRenderSince = 0;
+let pendingSnapshotData = null; // data dari server yang nunggu giliran aman buat diterapkan
 function shouldSkipAutoRender(){
   // Modal terbuka -> jangan render ulang di belakang layar (biar isian di form tidak hilang).
   if (state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showAddFixtureEvent || state.showBracketWinner || state.showAdminLogin || state.showEditPlayer) return true;
@@ -1537,9 +1538,8 @@ function shouldSkipAutoRender(){
   if (ae && (ae.tagName==='INPUT' || ae.tagName==='SELECT' || ae.tagName==='TEXTAREA')) return true;
   return false;
 }
-// Dipakai oleh event Firebase (auth state change, snapshot realtime) yang bisa muncul
-// kapan saja di belakang layar. Kalau lagi tidak aman untuk render ulang, tunda dulu
-// dan biarkan interval flush di bawah yang menyelesaikannya begitu user selesai berinteraksi.
+// Dipakai buat render ulang TANPA data baru (mis. setelah status login berubah). Kalau lagi
+// tidak aman, tunda dan biarkan interval flush di bawah yang menyelesaikannya.
 function safeRender(){
   if (shouldSkipAutoRender()){
     if (!pendingBackgroundRender) pendingBackgroundRenderSince = Date.now();
@@ -1547,6 +1547,26 @@ function safeRender(){
     return;
   }
   pendingBackgroundRender = false;
+  render();
+}
+// Dipakai buat menerapkan data BARU dari server. PENTING: dulu bug di sini — data lama
+// menimpa state.tournaments SEKETIKA walau render-nya ditunda, jadi field yang lagi diketik
+// (mis. nomor punggung pemain) mengacu ke objek yang sudah "dibuang" begitu data server
+// menimpa; begitu field itu di-blur, perubahannya nyasar ke objek basi itu dan hilang —
+// kelihatan seperti "balik ke angka sebelumnya". Sekarang PENERAPAN DATA-nya juga ditunda
+// bersamaan dengan render-nya, jadi objek yang lagi diedit tidak diganti di tengah jalan.
+function safeApplySnapshot(data){
+  if (shouldSkipAutoRender()){
+    pendingSnapshotData = data;
+    if (!pendingBackgroundRender) pendingBackgroundRenderSince = Date.now();
+    pendingBackgroundRender = true;
+    return;
+  }
+  pendingBackgroundRender = false;
+  fbApplyingRemote = true;
+  const applied = fbApplySnapshot(data);
+  fbApplyingRemote = false;
+  if (!applied && fbUser){ scheduleSave(); return; }
   render();
 }
 setInterval(function(){
@@ -1558,6 +1578,13 @@ setInterval(function(){
   const stuckTooLong = pendingBackgroundRenderSince && (Date.now() - pendingBackgroundRenderSince > 12000);
   if (!shouldSkipAutoRender() || stuckTooLong){
     pendingBackgroundRender = false;
+    if (pendingSnapshotData){
+      const data = pendingSnapshotData; pendingSnapshotData = null;
+      fbApplyingRemote = true;
+      const applied = fbApplySnapshot(data);
+      fbApplyingRemote = false;
+      if (!applied && fbUser){ scheduleSave(); return; }
+    }
     render();
   }
 }, 400);
@@ -3442,11 +3469,7 @@ function initFirebase(){
       if (fbWritePending) return; // ada tulisan lokal yang belum kelar, jangan ditimpa dulu
       docRef.get().then(function(snap){
         if (!snap.exists) return;
-        fbApplyingRemote = true;
-        const applied = fbApplySnapshot(snap.data());
-        fbApplyingRemote = false;
-        if (!applied && fbUser){ scheduleSave(); return; }
-        safeRender();
+        safeApplySnapshot(snap.data());
       }).catch(function(err){
         console.error('Gagal polling data terbaru dari Firebase:', err);
       });
