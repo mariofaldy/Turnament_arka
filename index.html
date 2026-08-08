@@ -1992,12 +1992,10 @@ function buildGroupStandings(t){
   // -- Kolom kiri: hasil pertandingan tim-tim di grup ini, dikelompokkan per matchday --
   const results = h('div', {class:'gs-results'});
   const resultsHead = h('div', {class:'gs-results-head', style:{display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', position:'relative'}}, ['Hasil Pertandingan']);
-  if (state.adminMode){
-    resultsHead.appendChild(h('button', {class:'icon-btn', style:{position:'absolute', right:'8px', color:'#1c1207'}, title:'Buat gambar Match Result', onclick:function(){
-      state.showMatchResult = {groupId: activeGroup.id, date: null};
-      render();
-    }}, icon('download',14)));
-  }
+  resultsHead.appendChild(h('button', {class:'icon-btn', style:{position:'absolute', right:'8px', color:'#1c1207'}, title:'Buat gambar Match Result', onclick:function(){
+    state.showMatchResult = {groupId: activeGroup.id, date: null};
+    render();
+  }}, icon('download',14)));
   results.appendChild(resultsHead);
   function groupIdOfTeam(teamId){ const tm=t.teams.find(function(x){return x.id===teamId;}); return tm ? tm.groupId : undefined; }
   const groupMatches = t.schedule.filter(function(s){
@@ -2439,7 +2437,13 @@ function drawCrest(ctx, img, team, cx, cy, r){
   ctx.save();
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.closePath(); ctx.clip();
   if (img){
-    ctx.drawImage(img, cx-r, cy-r, r*2, r*2);
+    // "cover" fit: skala berdasarkan sisi yang lebih kecil supaya logo memenuhi lingkaran
+    // penuh tanpa gepeng/distorsi, sama seperti object-fit:cover di CSS — sebelumnya logo
+    // yang tidak persegi sempurna dipaksa muat jadi kotak, jadi kelihatan lonjong/tidak bulat.
+    const iw = img.naturalWidth || img.width || 1, ih = img.naturalHeight || img.height || 1;
+    const scale = Math.max((r*2)/iw, (r*2)/ih);
+    const dw = iw*scale, dh = ih*scale;
+    ctx.drawImage(img, cx-dw/2, cy-dh/2, dw, dh);
   } else {
     ctx.fillStyle = '#3a2f14';
     ctx.fillRect(cx-r, cy-r, r*2, r*2);
@@ -2452,6 +2456,57 @@ function drawCrest(ctx, img, team, cx, cy, r){
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
   ctx.strokeStyle = '#f5b400'; ctx.lineWidth = 4; ctx.stroke();
 }
+// Tekstur latar mirip poster grunge/splatter: dasar hitam, percikan cat putih kecil-kecil
+// tersebar acak, plus goresan diagonal keemasan besar di sudut — dibikin prosedural
+// (bukan gambar asli) supaya tidak perlu aset eksternal dan hasilnya tetap konsisten.
+function drawSplatterTexture(ctx, W, H, seed){
+  let s = seed || 42;
+  function rand(){ s = (s*9301+49297) % 233280; return s/233280; }
+
+  // dasar gradasi gelap
+  const bgGrad = ctx.createLinearGradient(0,0,W,H);
+  bgGrad.addColorStop(0, '#0a0a0b'); bgGrad.addColorStop(0.55, '#111013'); bgGrad.addColorStop(1, '#181309');
+  ctx.fillStyle = bgGrad; ctx.fillRect(0,0,W,H);
+
+  // goresan diagonal besar warna gold/coklat di sudut kiri-bawah & kanan-atas (mirip cat kuas)
+  function paintStroke(cx, cy, len, wid, angle, color, alpha){
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(angle); ctx.globalAlpha = alpha;
+    const g = ctx.createLinearGradient(-len/2,0,len/2,0);
+    g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(0.5,color); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-len/2, -wid/2);
+    for (let i=0;i<=10;i++){ const x=-len/2+len*i/10; const y=(rand()-0.5)*wid*0.6 - wid/2; ctx.lineTo(x,y); }
+    for (let i=10;i>=0;i--){ const x=-len/2+len*i/10; const y=(rand()-0.5)*wid*0.6 + wid/2; ctx.lineTo(x,y); }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  paintStroke(W*0.15, H*0.08, W*1.3, 160, -0.55, '#5a4415', 0.5);
+  paintStroke(W*0.9, H*0.15, W*0.9, 110, -0.5, '#8a6a1e', 0.35);
+  paintStroke(W*0.1, H*0.93, W*1.1, 140, -0.5, '#6b5218', 0.4);
+  paintStroke(W*0.85, H*0.97, W*0.8, 90, -0.55, '#4a3a10', 0.3);
+
+  // percikan (splatter) putih & abu tersebar
+  for (let i=0;i<260;i++){
+    const x = rand()*W, y = rand()*H;
+    const r = rand()*rand()*5.5+0.4;
+    const nearCorner = (x<W*0.35&&y<H*0.3) || (x>W*0.6&&y<H*0.25) || (y>H*0.85);
+    ctx.globalAlpha = nearCorner ? (0.15+rand()*0.55) : (rand()*0.18);
+    ctx.fillStyle = rand()>0.15 ? '#ffffff' : '#d8d8d8';
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // sedikit noise gelap biar tidak flat
+  for (let i=0;i<90;i++){
+    const x=rand()*W, y=rand()*H, r=rand()*rand()*8+2;
+    ctx.globalAlpha = rand()*0.12;
+    ctx.fillStyle = '#000000';
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
 function truncateText(ctx, text, maxW){
   if (ctx.measureText(text).width <= maxW) return text;
   let t = text;
@@ -2461,44 +2516,46 @@ function truncateText(ctx, text, maxW){
 async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   const W = 1080;
   const rowH = 128, rowGap = 24;
-  const headerH = 460;
-  const footerH = 100;
+  const headerH = 500;
+  const footerH = 130;
   const H = headerH + matches.length*(rowH+rowGap) + footerH;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  const bgGrad = ctx.createLinearGradient(0,0,0,H);
-  bgGrad.addColorStop(0, '#0c0c0e'); bgGrad.addColorStop(1, '#1a1509');
-  ctx.fillStyle = bgGrad; ctx.fillRect(0,0,W,H);
-  function glow(cx,cy,r,color){
-    const g = ctx.createRadialGradient(cx,cy,0,cx,cy,r);
-    g.addColorStop(0,color); g.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-  }
-  glow(W*0.9, H*0.03, W*0.55, 'rgba(200,150,20,0.22)');
-  glow(W*0.05, H*0.98, W*0.45, 'rgba(200,150,20,0.14)');
+  drawSplatterTexture(ctx, W, H, 42);
 
+  const logoImg = await loadImgAsync(t.logoImageUrl);
   ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-  ctx.fillStyle = '#f5b400';
-  ctx.font = '700 30px Arial, sans-serif';
-  ctx.fillText(truncateText(ctx, t.name.toUpperCase(), W-160), W/2, 90);
+  let titleY = 90;
+  if (logoImg){
+    const lh = 110, lw = lh * (logoImg.naturalWidth/logoImg.naturalHeight || 1);
+    ctx.drawImage(logoImg, W/2-lw/2, 30, lw, lh);
+    titleY = 178;
+  } else {
+    ctx.fillStyle = '#f5b400';
+    ctx.font = '700 30px Arial, sans-serif';
+    ctx.fillText(truncateText(ctx, t.name.toUpperCase(), W-160), W/2, 90);
+    titleY = 90;
+  }
 
   ctx.font = '900 96px Arial, sans-serif';
   const partA = 'MATCH ', partB = 'RESULT';
   const wA = ctx.measureText(partA).width, wB = ctx.measureText(partB).width;
   let sx = W/2 - (wA+wB)/2;
+  const titleBaseY = titleY + 130;
   ctx.textAlign='left';
-  ctx.fillStyle = '#f5c518'; ctx.fillText(partA, sx, 210);
-  ctx.fillStyle = '#ffffff'; ctx.fillText(partB, sx+wA, 210);
+  ctx.fillStyle = '#f5c518'; ctx.fillText(partA, sx, titleBaseY);
+  ctx.fillStyle = '#ffffff'; ctx.fillText(partB, sx+wA, titleBaseY);
+  const subtitleY = titleBaseY + 65;
 
   ctx.textAlign='left'; ctx.font = '800 32px Arial, sans-serif';
   const gA = 'GROUP ', gB = groupLabel+'  ', gC = '|  ', gD = dateLabel.toUpperCase();
   const wgA=ctx.measureText(gA).width, wgB=ctx.measureText(gB).width, wgC=ctx.measureText(gC).width, wgD=ctx.measureText(gD).width;
   sx = W/2 - (wgA+wgB+wgC+wgD)/2;
-  ctx.fillStyle='#ffffff'; ctx.fillText(gA, sx, 275); sx+=wgA;
-  ctx.fillStyle='#f97316'; ctx.fillText(gB, sx, 275); sx+=wgB;
-  ctx.fillStyle='#ffffff'; ctx.fillText(gC, sx, 275); sx+=wgC;
-  ctx.fillStyle='#f5c518'; ctx.fillText(gD, sx, 275);
+  ctx.fillStyle='#ffffff'; ctx.fillText(gA, sx, subtitleY); sx+=wgA;
+  ctx.fillStyle='#f97316'; ctx.fillText(gB, sx, subtitleY); sx+=wgB;
+  ctx.fillStyle='#ffffff'; ctx.fillText(gC, sx, subtitleY); sx+=wgC;
+  ctx.fillStyle='#f5c518'; ctx.fillText(gD, sx, subtitleY);
 
   // load semua crest dulu (data URL -> aman ditarik ke canvas tanpa masalah CORS)
   const crestImgs = await Promise.all(matches.map(function(m){
@@ -2537,8 +2594,26 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
     y += barH+rowGap;
   });
 
-  ctx.textAlign='center'; ctx.font='600 24px Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,.55)';
-  ctx.fillText(t.name, W/2, H-45);
+  ctx.textAlign='center'; ctx.font='600 24px Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
+  if (t.igHandle){
+    const igText = '@'+t.igHandle.replace(/^@/,'');
+    ctx.font='600 26px Arial, sans-serif';
+    const igW = ctx.measureText(igText).width;
+    const iconSize = 30, gap = 10;
+    const totalW = iconSize+gap+igW;
+    const iconX = W/2 - totalW/2, iconY = H-62;
+    drawRoundedRect(ctx, iconX, iconY, iconSize, iconSize, 8);
+    ctx.strokeStyle='rgba(255,255,255,.65)'; ctx.lineWidth=2.2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(iconX+iconSize/2, iconY+iconSize/2, iconSize*0.26, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(iconX+iconSize*0.74, iconY+iconSize*0.26, 2, 0, Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,.65)'; ctx.fill();
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText(igText, iconX+iconSize+gap, iconY+iconSize/2+1);
+  } else {
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillText(t.name, W/2, H-45);
+  }
 }
 
 function buildMatchResultModal(t){
@@ -2552,35 +2627,20 @@ function buildMatchResultModal(t){
       return s.status==='finished' && groupIdOfTeam(s.teamAId)===gid && groupIdOfTeam(s.teamBId)===gid;
     }).sort(function(a,b){ return fixtureSortKey(a)-fixtureSortKey(b); });
   }
-  let availDates = Array.from(new Set(matchesForGroup(cfg.groupId).map(function(s){return s.date;})));
-  if (!cfg.date || availDates.indexOf(cfg.date)===-1) cfg.date = availDates.length ? availDates[availDates.length-1] : null;
 
   const overlay = h('div', {class:'modal-overlay', onclick:function(e){ if(e.target===overlay){ state.showMatchResult=null; render(); } }});
   const box = h('div', {class:'modal-box', style:{maxWidth:'560px'}});
   box.appendChild(h('div', {class:'modal-head'}, [h('h3',{},'Buat Gambar Match Result'), h('button',{class:'modal-close', onclick:function(){ state.showMatchResult=null; render(); }}, icon('x',20))]));
 
   const body = h('div', {class:'flex-col gap-4'});
-  const controlRow = h('div', {class:'form-row cols-2'});
+  const groupWrap = h('div', {});
+  groupWrap.appendChild(h('label',{class:'form-label'},'Grup'));
   const groupSel = h('select', {class:'form-input'}, groupList.map(function(g){ return h('option',{value:g.id}, g.name); }));
   groupSel.value = cfg.groupId;
-  const dateSel = h('select', {class:'form-input'});
-  function fillDateSel(){
-    dateSel.innerHTML = '';
-    availDates.forEach(function(d){ dateSel.appendChild(h('option',{value:d}, d)); });
-    dateSel.value = cfg.date || '';
-  }
-  fillDateSel();
-  groupSel.addEventListener('change', function(e){
-    cfg.groupId = e.target.value === 'null' ? null : e.target.value;
-    availDates = Array.from(new Set(matchesForGroup(cfg.groupId).map(function(s){return s.date;})));
-    cfg.date = availDates.length ? availDates[availDates.length-1] : null;
-    fillDateSel();
-    genPreview();
-  });
-  dateSel.addEventListener('change', function(e){ cfg.date = e.target.value; genPreview(); });
-  controlRow.appendChild(h('div',{},[h('label',{class:'form-label'},'Grup'), groupSel]));
-  controlRow.appendChild(h('div',{},[h('label',{class:'form-label'},'Tanggal'), dateSel]));
-  body.appendChild(controlRow);
+  groupSel.addEventListener('change', function(e){ cfg.groupId = e.target.value === 'null' ? null : e.target.value; genPreview(); });
+  groupWrap.appendChild(groupSel);
+  body.appendChild(groupWrap);
+  body.appendChild(h('p', {class:'text-xs muted', style:{margin:0}}, 'Semua hasil pertandingan yang sudah selesai di grup ini akan ditampilkan sekaligus. Tanggal poster diambil dari pertandingan pertama grup ini.'));
 
   const previewWrap = h('div', {style:{textAlign:'center', background:'var(--surface-2)', borderRadius:'10px', padding:'10px', minHeight:'120px', display:'flex', alignItems:'center', justifyContent:'center'}});
   const statusMsg = h('p', {class:'text-xs muted', style:{margin:'0', textAlign:'center'}}, 'Memuat pratinjau…');
@@ -2591,8 +2651,10 @@ function buildMatchResultModal(t){
   body.appendChild(downloadBtn);
 
   let currentCanvas = null;
+  let currentDateLabel = '';
   function genPreview(){
-    const matches = matchesForGroup(cfg.groupId).filter(function(s){ return s.date===cfg.date; }).map(function(s){
+    const sched = matchesForGroup(cfg.groupId);
+    const matches = sched.map(function(s){
       return {
         teamA: t.teams.find(function(x){return x.id===s.teamAId;}),
         teamB: t.teams.find(function(x){return x.id===s.teamBId;}),
@@ -2600,14 +2662,15 @@ function buildMatchResultModal(t){
       };
     });
     if (matches.length===0){
-      previewWrap.innerHTML=''; statusMsg.textContent = 'Tidak ada hasil pertandingan pada tanggal ini.';
+      previewWrap.innerHTML=''; statusMsg.textContent = 'Belum ada hasil pertandingan yang selesai di grup ini.';
       downloadBtn.disabled = true;
       return;
     }
+    currentDateLabel = sched[0].date; // tanggal pertandingan pertama grup ini
     statusMsg.textContent = 'Memuat pratinjau…';
     const groupName = (t.groups.find(function(g){return g.id===cfg.groupId;})||{}).name || 'SEMUA TIM';
     const canvas = document.createElement('canvas');
-    drawMatchResultPoster(t, canvas, groupName, cfg.date, matches).then(function(){
+    drawMatchResultPoster(t, canvas, groupName, currentDateLabel, matches).then(function(){
       currentCanvas = canvas;
       previewWrap.innerHTML = '';
       const img = h('img', {src:canvas.toDataURL('image/png'), style:{maxWidth:'100%', borderRadius:'8px', display:'block', margin:'0 auto'}});
@@ -2622,7 +2685,7 @@ function buildMatchResultModal(t){
   downloadBtn.addEventListener('click', function(){
     if (!currentCanvas) return;
     const a = document.createElement('a');
-    a.download = 'match-result-' + (cfg.date||'').replace(/\s+/g,'-') + '.png';
+    a.download = 'match-result-' + (currentDateLabel||'').replace(/\s+/g,'-') + '.png';
     a.href = currentCanvas.toDataURL('image/png');
     a.click();
   });
@@ -3137,6 +3200,39 @@ function buildAdminSettingsPage(t){
     editableText(function(){return t.name;}, function(v){t.name=v;}, 'text-wide')
   ]));
   panel1.appendChild(identityRow);
+
+  // Upload logo turnamen (gambar asli, dipakai di poster Match Result) — terpisah dari
+  // emoji/warna tema yang cuma dipakai buat ikon kecil di sidebar.
+  const logoUploadWrap = h('div', {style:{marginBottom:'18px'}});
+  logoUploadWrap.appendChild(h('label', {class:'form-label'}, 'Logo Turnamen (buat poster Match Result)'));
+  const logoPreviewRow = h('div', {class:'flex items-center gap-3'});
+  const logoPreview = t.logoImageUrl
+    ? h('img', {src:t.logoImageUrl, style:{height:'64px', width:'64px', objectFit:'contain', borderRadius:'10px', background:'rgba(0,0,0,.15)'}})
+    : h('div', {class:'text-xs muted', style:{height:'64px', width:'64px', display:'flex', alignItems:'center', justifyContent:'center', border:'1px dashed var(--border)', borderRadius:'10px'}}, 'Belum ada');
+  logoPreviewRow.appendChild(logoPreview);
+  const logoUploadBtn = h('button', {class:'btn btn-ghost-blue', onclick:function(){
+    pickImageFile(function(file){
+      compressImageFile(file, function(dataUrl, errMsg){
+        if (!dataUrl){ alert(errMsg || 'Gagal memuat logo.'); return; }
+        t.logoImageUrl = dataUrl;
+        render();
+      });
+    });
+  }}, [icon('camera',13), t.logoImageUrl ? 'Ganti Logo' : 'Upload Logo']);
+  logoPreviewRow.appendChild(logoUploadBtn);
+  if (t.logoImageUrl){
+    logoPreviewRow.appendChild(h('button', {class:'icon-btn', onclick:function(){ t.logoImageUrl=null; render(); }}, icon('x',14)));
+  }
+  logoUploadWrap.appendChild(logoPreviewRow);
+  panel1.appendChild(logoUploadWrap);
+
+  const igWrap = h('div', {style:{marginBottom:'18px'}});
+  igWrap.appendChild(h('label', {class:'form-label'}, 'Instagram (buat poster Match Result)'));
+  const igInput = h('input', {type:'text', class:'form-input', placeholder:'nama_akun_instagram', value:t.igHandle||''});
+  igInput.addEventListener('input', function(e){ t.igHandle = e.target.value; });
+  igInput.addEventListener('change', function(){ render(); });
+  igWrap.appendChild(igInput);
+  panel1.appendChild(igWrap);
 
   panel1.appendChild(h('div', {}, [h('label',{class:'form-label'},'Logo / Emoji Turnamen'), (function(){
     const g = h('div', {class:'emoji-grid'});
