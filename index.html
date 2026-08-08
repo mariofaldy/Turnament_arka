@@ -887,6 +887,7 @@ const state = {
   showImportTeams: false,
   showAddEvent: null,
   showBracketWinner: null,
+  showMatchResult: null,
   selectedTeamId: null,
   liveRunning: true,
   theme: 'dark',
@@ -940,6 +941,7 @@ function buildApp(){
   if (state.showAddFixtureEvent) app.appendChild(buildAddFixtureEventModal(t));
   if (state.showEditPlayer) app.appendChild(buildEditPlayerModal(t));
   if (state.showBracketWinner) app.appendChild(buildBracketWinnerModal(t));
+  if (state.showMatchResult) app.appendChild(buildMatchResultModal(t));
   if (state.showAdminLogin) app.appendChild(buildAdminLoginModal());
 
   return app;
@@ -1572,7 +1574,7 @@ let pendingBackgroundRenderSince = 0;
 let pendingSnapshotData = null; // data dari server yang nunggu giliran aman buat diterapkan
 function shouldSkipAutoRender(){
   // Modal terbuka -> jangan render ulang di belakang layar (biar isian di form tidak hilang).
-  if (state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showAddFixtureEvent || state.showBracketWinner || state.showAdminLogin || state.showEditPlayer) return true;
+  if (state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showAddFixtureEvent || state.showBracketWinner || state.showAdminLogin || state.showEditPlayer || state.showMatchResult) return true;
   // Ada input/select/textarea yang sedang fokus (termasuk saat kalender/jam native browser lagi kebuka)
   // -> jangan render ulang, supaya popup-nya tidak ketutup paksa.
   const ae = document.activeElement;
@@ -1989,7 +1991,14 @@ function buildGroupStandings(t){
 
   // -- Kolom kiri: hasil pertandingan tim-tim di grup ini, dikelompokkan per matchday --
   const results = h('div', {class:'gs-results'});
-  results.appendChild(h('div', {class:'gs-results-head'}, 'Hasil Pertandingan'));
+  const resultsHead = h('div', {class:'gs-results-head', style:{display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', position:'relative'}}, ['Hasil Pertandingan']);
+  if (state.adminMode){
+    resultsHead.appendChild(h('button', {class:'icon-btn', style:{position:'absolute', right:'8px', color:'#1c1207'}, title:'Buat gambar Match Result', onclick:function(){
+      state.showMatchResult = {groupId: activeGroup.id, date: null};
+      render();
+    }}, icon('download',14)));
+  }
+  results.appendChild(resultsHead);
   function groupIdOfTeam(teamId){ const tm=t.teams.find(function(x){return x.id===teamId;}); return tm ? tm.groupId : undefined; }
   const groupMatches = t.schedule.filter(function(s){
     return s.status==='finished' && groupIdOfTeam(s.teamAId)===activeGroup.id && groupIdOfTeam(s.teamBId)===activeGroup.id;
@@ -2405,6 +2414,224 @@ function buildBracketPanel(t){
   return outerPanel;
 }
 
+
+/* ---------- BRACKET WINNER / PENALTY SHOOTOUT MODAL ---------- */
+/* ---------- MATCH RESULT POSTER (generate gambar hasil pertandingan, bisa didownload) ---------- */
+function loadImgAsync(src){
+  return new Promise(function(resolve){
+    if (!src){ resolve(null); return; }
+    const img = new Image();
+    img.onload = function(){ resolve(img); };
+    img.onerror = function(){ resolve(null); };
+    img.src = src;
+  });
+}
+function drawRoundedRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+function drawCrest(ctx, img, team, cx, cy, r){
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.closePath(); ctx.clip();
+  if (img){
+    ctx.drawImage(img, cx-r, cy-r, r*2, r*2);
+  } else {
+    ctx.fillStyle = '#3a2f14';
+    ctx.fillRect(cx-r, cy-r, r*2, r*2);
+    ctx.fillStyle = '#f5b400';
+    ctx.font = '700 ' + Math.round(r*0.9) + 'px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(((team&&team.name)||'?').slice(0,1).toUpperCase(), cx, cy+2);
+  }
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.strokeStyle = '#f5b400'; ctx.lineWidth = 4; ctx.stroke();
+}
+function truncateText(ctx, text, maxW){
+  if (ctx.measureText(text).width <= maxW) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(t+'…').width > maxW) t = t.slice(0, -1);
+  return t + '…';
+}
+async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
+  const W = 1080;
+  const rowH = 128, rowGap = 24;
+  const headerH = 460;
+  const footerH = 100;
+  const H = headerH + matches.length*(rowH+rowGap) + footerH;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const bgGrad = ctx.createLinearGradient(0,0,0,H);
+  bgGrad.addColorStop(0, '#0c0c0e'); bgGrad.addColorStop(1, '#1a1509');
+  ctx.fillStyle = bgGrad; ctx.fillRect(0,0,W,H);
+  function glow(cx,cy,r,color){
+    const g = ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+    g.addColorStop(0,color); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  }
+  glow(W*0.9, H*0.03, W*0.55, 'rgba(200,150,20,0.22)');
+  glow(W*0.05, H*0.98, W*0.45, 'rgba(200,150,20,0.14)');
+
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  ctx.fillStyle = '#f5b400';
+  ctx.font = '700 30px Arial, sans-serif';
+  ctx.fillText(truncateText(ctx, t.name.toUpperCase(), W-160), W/2, 90);
+
+  ctx.font = '900 96px Arial, sans-serif';
+  const partA = 'MATCH ', partB = 'RESULT';
+  const wA = ctx.measureText(partA).width, wB = ctx.measureText(partB).width;
+  let sx = W/2 - (wA+wB)/2;
+  ctx.textAlign='left';
+  ctx.fillStyle = '#f5c518'; ctx.fillText(partA, sx, 210);
+  ctx.fillStyle = '#ffffff'; ctx.fillText(partB, sx+wA, 210);
+
+  ctx.textAlign='left'; ctx.font = '800 32px Arial, sans-serif';
+  const gA = 'GROUP ', gB = groupLabel+'  ', gC = '|  ', gD = dateLabel.toUpperCase();
+  const wgA=ctx.measureText(gA).width, wgB=ctx.measureText(gB).width, wgC=ctx.measureText(gC).width, wgD=ctx.measureText(gD).width;
+  sx = W/2 - (wgA+wgB+wgC+wgD)/2;
+  ctx.fillStyle='#ffffff'; ctx.fillText(gA, sx, 275); sx+=wgA;
+  ctx.fillStyle='#f97316'; ctx.fillText(gB, sx, 275); sx+=wgB;
+  ctx.fillStyle='#ffffff'; ctx.fillText(gC, sx, 275); sx+=wgC;
+  ctx.fillStyle='#f5c518'; ctx.fillText(gD, sx, 275);
+
+  // load semua crest dulu (data URL -> aman ditarik ke canvas tanpa masalah CORS)
+  const crestImgs = await Promise.all(matches.map(function(m){
+    return Promise.all([loadImgAsync(m.teamA&&m.teamA.logoUrl), loadImgAsync(m.teamB&&m.teamB.logoUrl)]);
+  }));
+
+  const barX = 130, barW = W-260, crestR = 56;
+  let y = headerH;
+  matches.forEach(function(m, i){
+    const barY = y, barH = rowH;
+    drawRoundedRect(ctx, barX, barY, barW, barH, 14);
+    const barGrad = ctx.createLinearGradient(barX,barY,barX+barW,barY);
+    barGrad.addColorStop(0,'#f5b400'); barGrad.addColorStop(1,'#d99a06');
+    ctx.fillStyle = barGrad; ctx.fill();
+
+    const cy = barY+barH/2;
+    drawCrest(ctx, crestImgs[i][0], m.teamA, barX, cy, crestR);
+    drawCrest(ctx, crestImgs[i][1], m.teamB, barX+barW, cy, crestR);
+
+    const scoreW = 190, scoreH = barH*0.82;
+    const scoreX = W/2 - scoreW/2, scoreY = cy - scoreH/2;
+    drawRoundedRect(ctx, scoreX, scoreY, scoreW, scoreH, 10);
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.fillStyle = '#12224a'; ctx.font='900 58px Arial, sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(m.scoreA+' - '+m.scoreB, W/2, cy+4);
+
+    ctx.font='800 30px Arial, sans-serif'; ctx.fillStyle='#12224a'; ctx.textBaseline='middle';
+    const leftTextX = barX+crestR+28, leftMaxW = scoreX-16-leftTextX;
+    ctx.textAlign='left';
+    ctx.fillText(truncateText(ctx, (m.teamA?m.teamA.name:'Tim Dihapus').toUpperCase(), leftMaxW), leftTextX, cy);
+    const rightTextX = barX+barW-crestR-28, rightMaxW = rightTextX-(scoreX+scoreW+16);
+    ctx.textAlign='right';
+    ctx.fillText(truncateText(ctx, (m.teamB?m.teamB.name:'Tim Dihapus').toUpperCase(), rightMaxW), rightTextX, cy);
+
+    y += barH+rowGap;
+  });
+
+  ctx.textAlign='center'; ctx.font='600 24px Arial, sans-serif'; ctx.fillStyle='rgba(255,255,255,.55)';
+  ctx.fillText(t.name, W/2, H-45);
+}
+
+function buildMatchResultModal(t){
+  const cfg = state.showMatchResult;
+  const groupList = t.groups.length ? t.groups : [{id:null, name:'Semua Tim'}];
+  if (!groupList.find(function(g){return g.id===cfg.groupId;})) cfg.groupId = groupList[0].id;
+
+  function groupIdOfTeam(teamId){ const tm=t.teams.find(function(x){return x.id===teamId;}); return tm ? tm.groupId : undefined; }
+  function matchesForGroup(gid){
+    return t.schedule.filter(function(s){
+      return s.status==='finished' && groupIdOfTeam(s.teamAId)===gid && groupIdOfTeam(s.teamBId)===gid;
+    }).sort(function(a,b){ return fixtureSortKey(a)-fixtureSortKey(b); });
+  }
+  let availDates = Array.from(new Set(matchesForGroup(cfg.groupId).map(function(s){return s.date;})));
+  if (!cfg.date || availDates.indexOf(cfg.date)===-1) cfg.date = availDates.length ? availDates[availDates.length-1] : null;
+
+  const overlay = h('div', {class:'modal-overlay', onclick:function(e){ if(e.target===overlay){ state.showMatchResult=null; render(); } }});
+  const box = h('div', {class:'modal-box', style:{maxWidth:'560px'}});
+  box.appendChild(h('div', {class:'modal-head'}, [h('h3',{},'Buat Gambar Match Result'), h('button',{class:'modal-close', onclick:function(){ state.showMatchResult=null; render(); }}, icon('x',20))]));
+
+  const body = h('div', {class:'flex-col gap-4'});
+  const controlRow = h('div', {class:'form-row cols-2'});
+  const groupSel = h('select', {class:'form-input'}, groupList.map(function(g){ return h('option',{value:g.id}, g.name); }));
+  groupSel.value = cfg.groupId;
+  const dateSel = h('select', {class:'form-input'});
+  function fillDateSel(){
+    dateSel.innerHTML = '';
+    availDates.forEach(function(d){ dateSel.appendChild(h('option',{value:d}, d)); });
+    dateSel.value = cfg.date || '';
+  }
+  fillDateSel();
+  groupSel.addEventListener('change', function(e){
+    cfg.groupId = e.target.value === 'null' ? null : e.target.value;
+    availDates = Array.from(new Set(matchesForGroup(cfg.groupId).map(function(s){return s.date;})));
+    cfg.date = availDates.length ? availDates[availDates.length-1] : null;
+    fillDateSel();
+    genPreview();
+  });
+  dateSel.addEventListener('change', function(e){ cfg.date = e.target.value; genPreview(); });
+  controlRow.appendChild(h('div',{},[h('label',{class:'form-label'},'Grup'), groupSel]));
+  controlRow.appendChild(h('div',{},[h('label',{class:'form-label'},'Tanggal'), dateSel]));
+  body.appendChild(controlRow);
+
+  const previewWrap = h('div', {style:{textAlign:'center', background:'var(--surface-2)', borderRadius:'10px', padding:'10px', minHeight:'120px', display:'flex', alignItems:'center', justifyContent:'center'}});
+  const statusMsg = h('p', {class:'text-xs muted', style:{margin:'0', textAlign:'center'}}, 'Memuat pratinjau…');
+  body.appendChild(previewWrap);
+  body.appendChild(statusMsg);
+
+  const downloadBtn = h('button', {class:'btn btn-primary w-full', style:{padding:'12px'}, disabled:true}, [icon('download',16), 'Download Gambar (PNG)']);
+  body.appendChild(downloadBtn);
+
+  let currentCanvas = null;
+  function genPreview(){
+    const matches = matchesForGroup(cfg.groupId).filter(function(s){ return s.date===cfg.date; }).map(function(s){
+      return {
+        teamA: t.teams.find(function(x){return x.id===s.teamAId;}),
+        teamB: t.teams.find(function(x){return x.id===s.teamBId;}),
+        scoreA: s.scoreA, scoreB: s.scoreB, date: s.date
+      };
+    });
+    if (matches.length===0){
+      previewWrap.innerHTML=''; statusMsg.textContent = 'Tidak ada hasil pertandingan pada tanggal ini.';
+      downloadBtn.disabled = true;
+      return;
+    }
+    statusMsg.textContent = 'Memuat pratinjau…';
+    const groupName = (t.groups.find(function(g){return g.id===cfg.groupId;})||{}).name || 'SEMUA TIM';
+    const canvas = document.createElement('canvas');
+    drawMatchResultPoster(t, canvas, groupName, cfg.date, matches).then(function(){
+      currentCanvas = canvas;
+      previewWrap.innerHTML = '';
+      const img = h('img', {src:canvas.toDataURL('image/png'), style:{maxWidth:'100%', borderRadius:'8px', display:'block', margin:'0 auto'}});
+      previewWrap.appendChild(img);
+      statusMsg.textContent = matches.length + ' pertandingan • siap didownload';
+      downloadBtn.disabled = false;
+    }).catch(function(err){
+      console.error('Gagal membuat poster:', err);
+      statusMsg.textContent = 'Gagal membuat pratinjau.';
+    });
+  }
+  downloadBtn.addEventListener('click', function(){
+    if (!currentCanvas) return;
+    const a = document.createElement('a');
+    a.download = 'match-result-' + (cfg.date||'').replace(/\s+/g,'-') + '.png';
+    a.href = currentCanvas.toDataURL('image/png');
+    a.click();
+  });
+  genPreview();
+
+  box.appendChild(body);
+  overlay.appendChild(box);
+  return overlay;
+}
 
 /* ---------- BRACKET WINNER / PENALTY SHOOTOUT MODAL ---------- */
 function buildBracketWinnerModal(t){
