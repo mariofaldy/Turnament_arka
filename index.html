@@ -2621,7 +2621,7 @@ function recolorSilhouette(img, hexColor, threshold){
 async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   const W = 1080;
   const rowH = 128, rowGap = 24;
-  const headerH = 560;
+  const headerH = 480;
   const hasSponsor = !!t.sponsorLogoUrl;
   const footerH = hasSponsor ? 190 : 90;
   const H = headerH + matches.length*(rowH+rowGap) + footerH;
@@ -2748,7 +2748,7 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
 async function drawKlasemenPoster(t, canvas, groupLabel, teams){
   const W = 1080;
   const rowH = 84, headHeight = 70;
-  const headerH = 560;
+  const headerH = 480;
   const hasSponsor = !!t.sponsorLogoUrl;
   const footerH = hasSponsor ? 190 : 90;
   const H = headerH + headHeight + teams.length*rowH + footerH;
