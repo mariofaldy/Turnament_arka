@@ -2637,7 +2637,7 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   let titleY = 90;
   if (logoImg){
     const cleanedLogo = removeDarkBackground(logoImg, 38);
-    const lh = 200, lw = lh * (cleanedLogo.width/cleanedLogo.height || 1);
+    const lh = 160, lw = lh * (cleanedLogo.width/cleanedLogo.height || 1);
     if (kickImg){
       // Sandingkan logo turnamen dengan ikon pemain nendang bola (upload sendiri) di
       // sebelah kirinya — otomatis bikin logonya sedikit bergeser ke kanan dari tengah.
@@ -2653,7 +2653,7 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
     } else {
       ctx.drawImage(cleanedLogo, W/2-lw/2, 30, lw, lh);
     }
-    titleY = 268;
+    titleY = 228;
   } else {
     ctx.fillStyle = '#f5b400';
     ctx.font = '700 30px Rajdhani, sans-serif';
@@ -2764,7 +2764,7 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams){
   let titleY = 90;
   if (logoImg){
     const cleanedLogo = removeDarkBackground(logoImg, 38);
-    const lh = 200, lw = lh * (cleanedLogo.width/cleanedLogo.height || 1);
+    const lh = 160, lw = lh * (cleanedLogo.width/cleanedLogo.height || 1);
     if (kickImg){
       // Sandingkan logo turnamen dengan ikon pemain nendang bola (upload sendiri) di
       // sebelah kirinya, tinggi disamakan dengan logo turnamen.
@@ -2780,7 +2780,7 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams){
     } else {
       ctx.drawImage(cleanedLogo, W/2-lw/2, 30, lw, lh);
     }
-    titleY = 268;
+    titleY = 228;
   } else {
     ctx.fillStyle = '#f5b400';
     ctx.font = '700 30px Rajdhani, sans-serif';
