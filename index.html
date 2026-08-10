@@ -3241,12 +3241,18 @@ function buildTeamsPage(t){
     const crestWrap = h('div', {style:{position:'relative'}});
     crestWrap.appendChild(team.logoUrl ? h('img',{src:team.logoUrl, class:'team-crest-lg', style:{objectFit:'cover'}}) : h('div', {class:'team-crest-lg', style:{background:GRAD_CSS[team.color]||GRAD_CSS['grad-blue']}}, team.emoji||'⚽'));
     if (state.adminMode){
+      const teamId = team.id;
       const uploadBtn = h('button', {class:'logo-upload-btn', type:'button', title:'Ganti logo tim', onclick:function(e){
         e.stopPropagation(); e.preventDefault();
         pickImageFile(function(file){
           compressImageFile(file, function(dataUrl, errMsg){
             if (!dataUrl){ alert(errMsg || 'Gagal memuat logo.'); return; }
-            team.logoUrl = dataUrl;
+            // Pakai data turnamen & tim TERKINI (bukan closure lama) — memilih file di galeri
+            // butuh waktu, dan sinkronisasi latar belakang bisa saja mengganti objeknya
+            // sementara itu, sehingga logo yang baru dipilih tidak nyasar ke objek yang sudah dibuang.
+            const liveTeam = T().teams.find(function(x){ return x.id===teamId; });
+            if (!liveTeam){ console.warn('Tim sudah tidak ada, logo dibatalkan.'); return; }
+            liveTeam.logoUrl = dataUrl;
             render();
           });
         });
@@ -3494,16 +3500,22 @@ function buildAdminSettingsPage(t){
     pickImageFile(function(file){
       compressImageFile(file, function(dataUrl, errMsg){
         if (!dataUrl){ console.error('[Logo Turnamen] gagal:', errMsg); alert(errMsg || 'Gagal memuat logo.'); return; }
-        console.log('[Logo Turnamen] berhasil dikompres, menyimpan ke t.logoImageUrl dan render ulang...');
-        t.logoImageUrl = dataUrl;
+        // PENTING: pakai T() di sini (objek turnamen TERKINI), bukan `t` yang ditangkap waktu
+        // tombol ini dibuat — soalnya milih file dari galeri butuh waktu, dan selama itu
+        // sinkronisasi latar belakang bisa saja mengganti objek turnamen (state.tournaments)
+        // ke versi baru. Kalau tetap pakai `t` yang lama, logonya kesimpen ke objek yang
+        // sudah dibuang dan hilang begitu halaman di-render ulang.
+        const liveT = T();
+        console.log('[Logo Turnamen] berhasil dikompres, menyimpan ke logoImageUrl (t.id terkini:', liveT.id, ') dan render ulang...');
+        liveT.logoImageUrl = dataUrl;
         render();
-        console.log('[Logo Turnamen] render selesai. t.logoImageUrl sekarang:', !!t.logoImageUrl);
+        console.log('[Logo Turnamen] render selesai. logoImageUrl sekarang:', !!liveT.logoImageUrl);
       });
     });
   }}, [icon('camera',13), t.logoImageUrl ? 'Ganti Logo' : 'Upload Logo']);
   logoPreviewRow.appendChild(logoUploadBtn);
   if (t.logoImageUrl){
-    logoPreviewRow.appendChild(h('button', {class:'icon-btn', onclick:function(){ t.logoImageUrl=null; render(); }}, icon('x',14)));
+    logoPreviewRow.appendChild(h('button', {class:'icon-btn', onclick:function(){ T().logoImageUrl=null; render(); }}, icon('x',14)));
   }
   logoUploadWrap.appendChild(logoPreviewRow);
   panel1.appendChild(logoUploadWrap);
