@@ -1337,8 +1337,8 @@ const LOGO_MAX_PX = 220;      // sisi terpanjang logo (bulat/tim) setelah di-res
 const LOGO_QUALITY = 0.76;    // kualitas JPEG buat logo bulat (0-1)
 const BANNER_MAX_PX = 900;    // sisi terpanjang buat gambar lebar (mis. strip logo sponsor)
 const BANNER_QUALITY = 0.82;  // kualitas JPEG buat strip logo (banyak logo kecil, perlu lebih tajam)
-const HERO_MAX_PX = 640;      // foto latar poster Klasemen — dikompres lebih ketat karena bisa
-const HERO_QUALITY = 0.68;    // ada satu per grup (menumpuk), dan sebagian besar ketutup gradasi gelap
+const HERO_MAX_PX = 480;      // foto latar poster Klasemen — dikompres ketat karena bisa
+const HERO_QUALITY = 0.58;    // ada satu per grup (menumpuk), dan sebagian besar ketutup gradasi gelap
 
 function compressImageFile(file, cb, maxPx, quality){
   maxPx = maxPx || LOGO_MAX_PX; quality = quality || LOGO_QUALITY;
