@@ -1472,14 +1472,19 @@ function buildLivePanel(t){
       state.adminMode ? h('button', {class:'pause-btn', onclick:function(){ state.liveRunning=!state.liveRunning; render(); }}, [icon(state.liveRunning?'pause':'play',12), state.liveRunning?'Jeda':'Lanjut']) : null,
       state.adminMode ? h('button', {class:'btn btn-ghost-purple', style:{fontSize:'11px', padding:'6px 10px'}, onclick:function(){
         if (!confirm('Reset pertandingan ini? Waktu kembali ke 00:00, skor, gol, dan kartu juga ikut kembali ke 0. Aksi ini tidak bisa dibatalkan.')) return;
-        t.liveMatch.minute = 0; t.liveMatch.second = 0;
-        t.liveMatch.teamA.score = 0; t.liveMatch.teamA.yellow = 0; t.liveMatch.teamA.red = 0; t.liveMatch.teamA.scorers = []; t.liveMatch.teamA.cards = [];
-        t.liveMatch.teamB.score = 0; t.liveMatch.teamB.yellow = 0; t.liveMatch.teamB.red = 0; t.liveMatch.teamB.scorers = []; t.liveMatch.teamB.cards = [];
+        // Pakai T() (data terkini) — kalau pertandingan sempat di-Jeda cukup lama sebelum
+        // tombol ini diklik, sinkronisasi latar belakang bisa saja mengganti objek turnamen.
+        const liveM = T().liveMatch;
+        if (!liveM) return;
+        liveM.minute = 0; liveM.second = 0;
+        liveM.teamA.score = 0; liveM.teamA.yellow = 0; liveM.teamA.red = 0; liveM.teamA.scorers = []; liveM.teamA.cards = [];
+        liveM.teamB.score = 0; liveM.teamB.yellow = 0; liveM.teamB.red = 0; liveM.teamB.scorers = []; liveM.teamB.cards = [];
         state.liveRunning = false;
         render();
       }}, [icon('refresh',12), 'Reset']) : null,
       state.adminMode ? h('button', {class:'btn btn-ghost-green', style:{fontSize:'11px', padding:'6px 10px'}, onclick:function(){
-        finalizeLiveMatch(t); state.liveRunning=false; render();
+        // Sama — pakai T() supaya tetap benar walau match sempat dijeda lama sebelum diklik.
+        finalizeLiveMatch(T()); state.liveRunning=false; render();
       }}, [icon('check',12), 'Selesai Pertandingan']) : null
     ])
   ]);
@@ -3344,7 +3349,11 @@ function buildFixturesPage(t){
     timeInp.addEventListener('change', function(e){ fixtureForm.time = e.target.value; });
     const addBtn = h('button', {class:'btn btn-primary', onclick:function(){
       if (!fixtureForm.teamAId || !fixtureForm.teamBId || fixtureForm.teamAId===fixtureForm.teamBId || !fixtureForm.date || !fixtureForm.time) return;
-      t.schedule.push({id:nextId(), teamAId:fixtureForm.teamAId, teamBId:fixtureForm.teamBId, date:fixtureForm.date, time:fixtureForm.time, status:'upcoming', scoreA:0, scoreB:0, statsApplied:false});
+      // Pakai T() (data turnamen TERKINI) di sini, bukan `t` yang ditangkap waktu halaman ini
+      // pertama dirender — kalau formnya diisi agak lama, sinkronisasi latar belakang bisa
+      // mengganti objek turnamen sementara itu, dan jadwal baru bisa nyasar ke objek yang
+      // sudah dibuang kalau tetap pakai `t` yang lama.
+      T().schedule.push({id:nextId(), teamAId:fixtureForm.teamAId, teamBId:fixtureForm.teamBId, date:fixtureForm.date, time:fixtureForm.time, status:'upcoming', scoreA:0, scoreB:0, statsApplied:false});
       fixtureForm.date=''; fixtureForm.time='';
       render();
     }}, [icon('plus',14), 'Tambah']);
