@@ -2589,7 +2589,7 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   const rowH = 128, rowGap = 24;
   const headerH = 560;
   const hasSponsor = !!t.sponsorLogoUrl;
-  const footerH = 130 + (hasSponsor ? 150 : 0);
+  const footerH = hasSponsor ? 190 : 90;
   const H = headerH + matches.length*(rowH+rowGap) + footerH;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -2673,28 +2673,11 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
 
   if (hasSponsor){
     const sponsorImg = await loadImgAsync(t.sponsorLogoUrl);
-    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-130-140, 130);
-  }
-
-  ctx.textAlign='center'; ctx.font='600 24px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
-  if (t.igHandle){
-    const igText = t.igHandle.replace(/^@/,'');
-    ctx.font='600 26px Rajdhani, sans-serif';
-    const igW = ctx.measureText(igText).width;
-    const iconSize = 30, gap = 10;
-    const totalW = iconSize+gap+igW;
-    const iconX = W/2 - totalW/2, iconY = H-62;
-    drawRoundedRect(ctx, iconX, iconY, iconSize, iconSize, 8);
-    ctx.strokeStyle='rgba(255,255,255,.65)'; ctx.lineWidth=2.2; ctx.stroke();
-    ctx.beginPath(); ctx.arc(iconX+iconSize/2, iconY+iconSize/2, iconSize*0.26, 0, Math.PI*2);
-    ctx.stroke();
-    ctx.beginPath(); ctx.arc(iconX+iconSize*0.74, iconY+iconSize*0.26, 2, 0, Math.PI*2);
-    ctx.fillStyle='rgba(255,255,255,.65)'; ctx.fill();
-    ctx.textAlign='left'; ctx.textBaseline='middle';
-    ctx.fillText(igText, iconX+iconSize+gap, iconY+iconSize/2+1);
+    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-190+30, 150);
   } else {
-    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-    ctx.fillText(t.name, W/2, H-45);
+    ctx.textAlign='center'; ctx.font='600 24px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
+    ctx.textBaseline='alphabetic';
+    ctx.fillText(t.name, W/2, H-40);
   }
 }
 
@@ -2704,7 +2687,7 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams){
   const rowH = 84, headHeight = 70;
   const headerH = 560;
   const hasSponsor = !!t.sponsorLogoUrl;
-  const footerH = 110 + (hasSponsor ? 150 : 0);
+  const footerH = hasSponsor ? 190 : 90;
   const H = headerH + headHeight + teams.length*rowH + footerH;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -2818,27 +2801,10 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams){
 
   if (hasSponsor){
     const sponsorImg = await loadImgAsync(t.sponsorLogoUrl);
-    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-110-140, 130);
-  }
-
-  ctx.textAlign='center'; ctx.font='600 24px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
-  if (t.igHandle){
-    const igText = t.igHandle.replace(/^@/,'');
-    ctx.font='600 26px Rajdhani, sans-serif';
-    const igW = ctx.measureText(igText).width;
-    const iconSize = 30, gap = 10;
-    const totalW = iconSize+gap+igW;
-    const iconX = W/2 - totalW/2, iconY = H-58;
-    drawRoundedRect(ctx, iconX, iconY, iconSize, iconSize, 8);
-    ctx.strokeStyle='rgba(255,255,255,.65)'; ctx.lineWidth=2.2; ctx.stroke();
-    ctx.beginPath(); ctx.arc(iconX+iconSize/2, iconY+iconSize/2, iconSize*0.26, 0, Math.PI*2);
-    ctx.stroke();
-    ctx.beginPath(); ctx.arc(iconX+iconSize*0.74, iconY+iconSize*0.26, 2, 0, Math.PI*2);
-    ctx.fillStyle='rgba(255,255,255,.65)'; ctx.fill();
-    ctx.textAlign='left'; ctx.textBaseline='middle';
-    ctx.fillText(igText, iconX+iconSize+gap, iconY+iconSize/2+1);
+    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-190+30, 150);
   } else {
-    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.textAlign='center'; ctx.font='600 24px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
+    ctx.textBaseline='alphabetic';
     ctx.fillText(t.name, W/2, H-40);
   }
 }
