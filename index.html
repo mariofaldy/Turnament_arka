@@ -2644,22 +2644,23 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   }));
 
   const barX = 130, barW = W-260, crestR = 56;
+  const barH = crestR*2 + 8; // tinggi bar oranye dipaskan sejajar sama lingkaran logo, bukan setinggi seluruh slot baris
   let y = headerH;
   matches.forEach(function(m, i){
-    const barY = y, barH = rowH;
+    const cy = y + rowH/2; // titik tengah slot baris (dipakai buat posisi logo & bar, konsisten dgn jarak antar baris)
+    const barY = cy - barH/2;
     drawRoundedRect(ctx, barX, barY, barW, barH, 14);
     const barGrad = ctx.createLinearGradient(barX,barY,barX+barW,barY);
     barGrad.addColorStop(0,'#f5b400'); barGrad.addColorStop(1,'#d99a06');
     ctx.fillStyle = barGrad; ctx.fill();
 
-    const cy = barY+barH/2;
     drawCrest(ctx, crestImgs[i][0], m.teamA, barX, cy, crestR);
     drawCrest(ctx, crestImgs[i][1], m.teamB, barX+barW, cy, crestR);
 
     const scoreText = m.scoreA+' - '+m.scoreB;
     ctx.font='700 58px Rajdhani, sans-serif';
     const scoreTextW = ctx.measureText(scoreText).width;
-    const scoreW = scoreTextW + 46, scoreH = barH*0.82;
+    const scoreW = scoreTextW + 46, scoreH = rowH*0.82; // ukuran kotak putih tetap, tidak ikut mengecil bareng bar oranye
     const scoreX = W/2 - scoreW/2, scoreY = cy - scoreH/2;
     drawRoundedRect(ctx, scoreX, scoreY, scoreW, scoreH, 10);
     ctx.fillStyle = '#ffffff'; ctx.fill();
@@ -2675,7 +2676,7 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
     ctx.textAlign='right';
     ctx.fillText(truncateText(ctx, (m.teamB?m.teamB.name:'Tim Dihapus').toUpperCase(), rightMaxW), rightTextX, cy);
 
-    y += barH+rowGap;
+    y += rowH+rowGap;
   });
 
   if (hasSponsor){
