@@ -2551,6 +2551,24 @@ function truncateText(ctx, text, maxW){
   while (t.length > 1 && ctx.measureText(t+'…').width > maxW) t = t.slice(0, -1);
   return t + '…';
 }
+// Pecah teks jadi beberapa baris supaya tidak melebihi lebar maksimal (mis. nama turnamen
+// yang panjang di header poster Klasemen gaya hero-image). Font harus sudah di-set di ctx
+// sebelum manggil ini, karena pakai ctx.measureText().
+function wrapText(ctx, text, maxW){
+  const words = text.split(' ');
+  const lines = [];
+  let current = '';
+  words.forEach(function(w){
+    const test = current ? current+' '+w : w;
+    if (ctx.measureText(test).width > maxW && current){
+      lines.push(current); current = w;
+    } else {
+      current = test;
+    }
+  });
+  if (current) lines.push(current);
+  return lines;
+}
 // Menghilangkan latar gelap/hitam dari logo yang diupload, supaya di poster cuma keliatan
 // tulisan/gambar logonya doang (transparan), bukan kotak hitam di belakangnya. Pakai teknik
 // chroma-key sederhana: piksel yang gelap banget dibikin transparan penuh, yang agak gelap
@@ -2744,14 +2762,20 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   }
 }
 
-/* ---------- KLASEMEN GRUP POSTER (gambar tabel klasemen, gaya sama dengan Match Result) ---------- */
+/* ---------- KLASEMEN GRUP POSTER (gaya baru: foto latar/hero + baris klasemen kapsul) ---------- */
 async function drawKlasemenPoster(t, canvas, groupLabel, teams){
   const W = 1080;
-  const rowH = 84, headHeight = 70;
-  const headerH = 480;
+  const hasHero = !!t.heroImageUrl;
   const hasSponsor = !!t.sponsorLogoUrl;
+  const heroH = hasHero ? 560 : 0;
+  const dateH = 60;
+  const barH = 92;
+  const labelH = 40;
+  const rowH = 78, rowGap = 10;
   const footerH = hasSponsor ? 190 : 90;
-  const H = headerH + headHeight + teams.length*rowH + footerH;
+  const topPad = hasHero ? 0 : 40; // sedikit jarak atas kalau tidak ada foto latar (header polos seperti sebelumnya)
+  const compactHeaderH = hasHero ? 0 : 300; // tinggi header polos (logo+judul) kalau tidak ada foto latar
+  const H = topPad + heroH + compactHeaderH + dateH + barH + labelH + teams.length*(rowH+rowGap) + footerH;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   await ensurePosterFontsReady();
@@ -2760,121 +2784,150 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams){
 
   const logoImg = await loadImgAsync(t.logoImageUrl);
   const kickImg = await loadImgAsync(t.kickIconUrl);
-  ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-  let titleY = 90;
-  if (logoImg){
-    const cleanedLogo = removeDarkBackground(logoImg, 38);
-    const lh = 160, lw = lh * (cleanedLogo.width/cleanedLogo.height || 1);
-    if (kickImg){
-      // Sandingkan logo turnamen dengan ikon pemain nendang bola (upload sendiri) di
-      // sebelah kirinya, tinggi disamakan dengan logo turnamen.
-      const cleanedKick = recolorSilhouette(kickImg, '#ffffff', 40);
-      const iconH = lh, iconW = iconH * (cleanedKick.width/cleanedKick.height || 1);
-      const comboGap = 22;
-      const comboW = iconW + comboGap + lw;
-      const comboLeft = W/2 - comboW/2;
-      const iconCx = comboLeft + iconW/2;
-      const logoLeft = comboLeft + iconW + comboGap;
-      ctx.drawImage(cleanedLogo, logoLeft, 30, lw, lh);
-      ctx.drawImage(cleanedKick, iconCx-iconW/2, 30+lh/2-iconH/2, iconW, iconH);
+  const heroImg = hasHero ? await loadImgAsync(t.heroImageUrl) : null;
+
+  let cursorY = topPad;
+
+  if (hasHero && heroImg){
+    // foto latar, di-crop "cover" biar penuh tanpa gepeng
+    const iw = heroImg.naturalWidth||heroImg.width||1, ih = heroImg.naturalHeight||heroImg.height||1;
+    const scale = Math.max(W/iw, heroH/ih);
+    const dw = iw*scale, dh = ih*scale;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0,0,W,heroH); ctx.clip();
+    ctx.drawImage(heroImg, W/2-dw/2, heroH/2-dh/2, dw, dh);
+    ctx.restore();
+    // gradasi gelap di atas (biar logo/nama kebaca) & di bawah (transisi halus ke background poster)
+    const gTop = ctx.createLinearGradient(0,0,0,140);
+    gTop.addColorStop(0,'rgba(10,10,12,.75)'); gTop.addColorStop(1,'rgba(10,10,12,0)');
+    ctx.fillStyle = gTop; ctx.fillRect(0,0,W,140);
+    const gBot = ctx.createLinearGradient(0,heroH-180,0,heroH);
+    gBot.addColorStop(0,'rgba(10,10,12,0)'); gBot.addColorStop(1,'rgba(10,10,12,.98)');
+    ctx.fillStyle = gBot; ctx.fillRect(0,heroH-180,W,180);
+
+    // logo turnamen + nama, pojok kiri atas
+    if (logoImg){
+      const cleanedLogo = removeDarkBackground(logoImg, 38);
+      const lgh = 66, lgw = lgh*(cleanedLogo.width/cleanedLogo.height||1);
+      ctx.drawImage(cleanedLogo, 34, 30, lgw, lgh);
+      ctx.textAlign='left'; ctx.font='700 27px Rajdhani, sans-serif'; ctx.fillStyle='#ffffff';
+      const nameLines = wrapText(ctx, t.name.toUpperCase(), 220);
+      nameLines.slice(0,2).forEach(function(line, li){ ctx.fillText(line, 34+lgw+14, 52+li*30); });
     } else {
-      ctx.drawImage(cleanedLogo, W/2-lw/2, 30, lw, lh);
+      ctx.textAlign='left'; ctx.font='700 27px Rajdhani, sans-serif'; ctx.fillStyle='#ffffff';
+      wrapText(ctx, t.name.toUpperCase(), 260).slice(0,2).forEach(function(line, li){ ctx.fillText(line, 34, 52+li*30); });
     }
-    titleY = 228;
+    // ikon pemain nendang bola, pojok kanan atas (gantikan badge "LOGO")
+    if (kickImg){
+      const cleanedKick = recolorSilhouette(kickImg, '#ffffff', 40);
+      const ich = 74, icw = ich*(cleanedKick.width/cleanedKick.height||1);
+      ctx.drawImage(cleanedKick, W-34-icw, 24, icw, ich);
+    }
+    cursorY = heroH;
   } else {
-    ctx.fillStyle = '#f5b400';
-    ctx.font = '700 30px Rajdhani, sans-serif';
-    ctx.fillText(truncateText(ctx, t.name.toUpperCase(), W-160), W/2, 90);
-    titleY = 90;
+    // Tidak ada foto latar -> pakai header polos (logo + ikon + judul), mirip gaya sebelumnya.
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    let titleY = 90;
+    if (logoImg){
+      const cleanedLogo = removeDarkBackground(logoImg, 38);
+      const lh = 160, lw = lh * (cleanedLogo.width/cleanedLogo.height || 1);
+      if (kickImg){
+        const cleanedKick = recolorSilhouette(kickImg, '#ffffff', 40);
+        const iconH = lh, iconW = iconH * (cleanedKick.width/cleanedKick.height || 1);
+        const comboGap = 22;
+        const comboW = iconW + comboGap + lw;
+        const comboLeft = W/2 - comboW/2;
+        const iconCx = comboLeft + iconW/2;
+        const logoLeft = comboLeft + iconW + comboGap;
+        ctx.drawImage(cleanedLogo, logoLeft, topPad+30, lw, lh);
+        ctx.drawImage(cleanedKick, iconCx-iconW/2, topPad+30+lh/2-iconH/2, iconW, iconH);
+      } else {
+        ctx.drawImage(cleanedLogo, W/2-lw/2, topPad+30, lw, lh);
+      }
+      titleY = topPad+228;
+    } else {
+      ctx.fillStyle = '#f5b400';
+      ctx.font = '700 30px Rajdhani, sans-serif';
+      ctx.fillText(truncateText(ctx, t.name.toUpperCase(), W-160), W/2, topPad+90);
+      titleY = topPad+90;
+    }
+    ctx.font = '700 60px Rajdhani, sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle = '#f5c518'; ctx.fillText('KLASEMEN GRUP', W/2, titleY+80);
+    cursorY = topPad + compactHeaderH;
   }
 
-  ctx.font = '700 92px Rajdhani, sans-serif';
-  const partA = 'KLASEMEN ', partB = 'GRUP';
-  const wA = ctx.measureText(partA).width, wB = ctx.measureText(partB).width;
-  let sx = W/2 - (wA+wB)/2;
-  const titleBaseY = titleY + 125;
-  ctx.textAlign='left';
-  ctx.fillStyle = '#f5c518'; ctx.fillText(partA, sx, titleBaseY);
-  ctx.fillStyle = '#ffffff'; ctx.fillText(partB, sx+wA, titleBaseY);
-  const subtitleY = titleBaseY + 65;
+  // Tanggal (hari ini — snapshot klasemen sementara)
+  const todayStr = new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.font='italic 600 26px Rajdhani, sans-serif'; ctx.fillStyle='#f5c518';
+  ctx.fillText(todayStr, 60, cursorY+40);
+  cursorY += dateH;
 
-  ctx.font = '700 32px Rajdhani, sans-serif';
-  const groupLetter = (groupLabel||'').trim().split(/\s+/).pop() || groupLabel;
-  const gA = 'GROUP ', gB = groupLetter.toUpperCase();
-  const wgA=ctx.measureText(gA).width, wgB=ctx.measureText(gB).width;
-  sx = W/2 - (wgA+wgB)/2;
-  ctx.fillStyle='#ffffff'; ctx.fillText(gA, sx, subtitleY); sx+=wgA;
-  ctx.fillStyle='#f97316'; ctx.fillText(gB, sx, subtitleY);
+  // Bar emas "KLASEMEN GRUP X" — rata tengah, warna identik dengan poster Hasil Pertandingan.
+  const barX = 60, barW = W-120;
+  drawRoundedRect(ctx, barX, cursorY, barW, barH, 14);
+  const barGrad = ctx.createLinearGradient(barX,cursorY,barX+barW,cursorY);
+  barGrad.addColorStop(0,'#f5b400'); barGrad.addColorStop(1,'#d99a06');
+  ctx.fillStyle = barGrad; ctx.fill();
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const groupLetter = (groupLabel||'').trim();
+  ctx.font='700 40px Rajdhani, sans-serif'; ctx.fillStyle='#1c1207';
+  ctx.fillText('KLASEMEN ' + groupLetter.toUpperCase(), W/2, cursorY+barH/2+2);
+  cursorY += barH + 14;
+
+  // Label kolom
+  const tableX = barX, tableW = barW;
+  const cols = [
+    {key:'pos', label:'POS', w:0.09}, {key:'team', label:'TIM', w:0.31},
+    {key:'m', label:'T', w:0.08}, {key:'w', label:'M', w:0.075}, {key:'d', label:'S', w:0.075},
+    {key:'l', label:'K', w:0.075}, {key:'gd', label:'+/-', w:0.10}, {key:'pt', label:'POIN', w:0.135}
+  ];
+  let cxp = tableX; const colX = {};
+  cols.forEach(function(c){ colX[c.key]=cxp; cxp += tableW*c.w; });
+  ctx.font='600 20px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.55)'; ctx.textBaseline='middle';
+  cols.forEach(function(c){
+    ctx.textAlign = (c.key==='team') ? 'left' : 'center';
+    const tx = c.key==='team' ? colX[c.key]+66 : colX[c.key]+(tableW*c.w)/2;
+    ctx.fillText(c.label, tx, cursorY+labelH/2);
+  });
+  cursorY += labelH;
 
   const crestImgs = await Promise.all(teams.map(function(tm){ return loadImgAsync(tm.logoUrl); }));
 
-  const tableX = 90, tableW = W-180;
-  let y = headerH;
-  // header tabel
-  drawRoundedRect(ctx, tableX, y, tableW, headHeight, 10);
-  const headGrad = ctx.createLinearGradient(tableX,y,tableX+tableW,y);
-  headGrad.addColorStop(0,'#1e3a8a'); headGrad.addColorStop(1,'#0f172a');
-  ctx.fillStyle = headGrad; ctx.fill();
-  const cols = [
-    {key:'pos', label:'POS', w:0.09}, {key:'team', label:'TIM', w:0.34},
-    {key:'m', label:'M', w:0.09}, {key:'w', label:'M', w:0.08}, {key:'d', label:'S', w:0.08},
-    {key:'l', label:'K', w:0.08}, {key:'gd', label:'SG', w:0.10}, {key:'pt', label:'POIN', w:0.14}
-  ];
-  let cx = tableX;
-  const colX = {};
-  cols.forEach(function(c){ colX[c.key]=cx; cx += tableW*c.w; });
-  ctx.font = '600 22px Rajdhani, sans-serif'; ctx.fillStyle = '#ffffff'; ctx.textBaseline='middle';
-  cols.forEach(function(c){
-    ctx.textAlign = (c.key==='team') ? 'left' : 'center';
-    const tx = c.key==='team' ? colX[c.key]+70 : colX[c.key]+(tableW*c.w)/2;
-    ctx.fillText(c.label, tx, y+headHeight/2);
-  });
-  y += headHeight;
-
   teams.forEach(function(tm, i){
-    const rowY = y, isTop = i===0;
-    if (isTop){
-      ctx.fillStyle = 'rgba(245,180,0,.14)'; ctx.fillRect(tableX, rowY, tableW, rowH);
-    } else if (i%2===1){
-      ctx.fillStyle = 'rgba(255,255,255,.035)'; ctx.fillRect(tableX, rowY, tableW, rowH);
-    }
-    ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(tableX, rowY+rowH); ctx.lineTo(tableX+tableW, rowY+rowH); ctx.stroke();
+    const rowY = cursorY, rcy = rowY+rowH/2;
+    // kapsul — warna emas identik poster Hasil Pertandingan, sedikit lebih terang buat juara grup
+    drawRoundedRect(ctx, tableX, rowY, tableW, rowH, rowH/2);
+    const rowGrad = ctx.createLinearGradient(tableX,rowY,tableX+tableW,rowY);
+    if (i===0){ rowGrad.addColorStop(0,'#f9c94a'); rowGrad.addColorStop(1,'#e0a520'); }
+    else { rowGrad.addColorStop(0,'#f5b400'); rowGrad.addColorStop(1,'#d99a06'); }
+    ctx.fillStyle = rowGrad; ctx.fill();
 
-    const rcy = rowY+rowH/2;
-    // posisi (badge bulat)
+    // badge posisi
     const badgeR = 20, badgeCx = colX.pos+(tableW*0.09)/2;
     ctx.beginPath(); ctx.arc(badgeCx, rcy, badgeR, 0, Math.PI*2);
-    if (i===0){ const g=ctx.createLinearGradient(badgeCx-badgeR,rcy,badgeCx+badgeR,rcy); g.addColorStop(0,'#f5b400'); g.addColorStop(1,'#b45309'); ctx.fillStyle=g; }
-    else if (i===1){ const g=ctx.createLinearGradient(badgeCx-badgeR,rcy,badgeCx+badgeR,rcy); g.addColorStop(0,'#e2e8f0'); g.addColorStop(1,'#94a3b8'); ctx.fillStyle=g; }
-    else if (i===2){ const g=ctx.createLinearGradient(badgeCx-badgeR,rcy,badgeCx+badgeR,rcy); g.addColorStop(0,'#d97706'); g.addColorStop(1,'#78350f'); ctx.fillStyle=g; }
-    else { ctx.fillStyle = 'rgba(255,255,255,.12)'; }
-    ctx.fill();
-    ctx.fillStyle = (i<3) ? '#1c1207' : '#ffffff';
-    ctx.font='700 22px Rajdhani, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle = '#12224a'; ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.font='700 22px Rajdhani, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(String(i+1), badgeCx, rcy+1);
 
     // crest + nama tim
-    const crestR = 22, crestCx = colX.team+34;
+    const crestR = 22, crestCx = colX.team+30;
     drawCrest(ctx, crestImgs[i], tm, crestCx, rcy, crestR);
-    ctx.font='700 25px Rajdhani, sans-serif'; ctx.fillStyle='#ffffff'; ctx.textAlign='left';
-    const nameMaxW = tableW*0.34 - 70;
-    ctx.fillText(truncateText(ctx, tm.name.toUpperCase(), nameMaxW), colX.team+68, rcy+1);
+    ctx.font='700 24px Rajdhani, sans-serif'; ctx.fillStyle='#12224a'; ctx.textAlign='left';
+    const nameMaxW = tableW*0.31 - 62;
+    ctx.fillText(truncateText(ctx, tm.name.toUpperCase(), nameMaxW), colX.team+58, rcy+1);
 
     // statistik
-    ctx.font='600 24px Rajdhani, sans-serif'; ctx.textAlign='center';
-    ctx.fillStyle='rgba(255,255,255,.85)';
-    ctx.fillText(String(tm.stats.played||0), colX.m+(tableW*0.09)/2, rcy+1);
-    ctx.fillText(String(tm.stats.win||0), colX.w+(tableW*0.08)/2, rcy+1);
-    ctx.fillText(String(tm.stats.draw||0), colX.d+(tableW*0.08)/2, rcy+1);
-    ctx.fillText(String(tm.stats.lose||0), colX.l+(tableW*0.08)/2, rcy+1);
+    ctx.font='600 22px Rajdhani, sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#12224a';
+    ctx.fillText(String(tm.stats.played||0), colX.m+(tableW*0.08)/2, rcy+1);
+    ctx.fillText(String(tm.stats.win||0), colX.w+(tableW*0.075)/2, rcy+1);
+    ctx.fillText(String(tm.stats.draw||0), colX.d+(tableW*0.075)/2, rcy+1);
+    ctx.fillText(String(tm.stats.lose||0), colX.l+(tableW*0.075)/2, rcy+1);
     const gd = tm.stats.gd||0;
-    ctx.fillStyle = gd>=0 ? '#4ade80' : '#f87171';
     ctx.fillText((gd>0?'+':'')+gd, colX.gd+(tableW*0.10)/2, rcy+1);
-    ctx.font='700 26px Rajdhani, sans-serif'; ctx.fillStyle='#f5c518';
-    ctx.fillText(String(tm.stats.pts||0), colX.pt+(tableW*0.14)/2, rcy+1);
+    ctx.font='700 24px Rajdhani, sans-serif';
+    ctx.fillText(String(tm.stats.pts||0), colX.pt+(tableW*0.135)/2, rcy+1);
 
-    y += rowH;
+    cursorY += rowH+rowGap;
   });
 
   if (hasSponsor){
@@ -3762,6 +3815,32 @@ function buildAdminSettingsPage(t){
   kickWrap.appendChild(kickPreviewRow);
   kickWrap.appendChild(h('p', {class:'text-xs muted', style:{margin:'6px 0 0'}}, 'Pakai gambar siluet putih/gelap di atas latar hitam (kayak contoh ikon pemain nendang bola) — latar hitamnya otomatis dihapus dan diwarnai oranye di poster.'));
   panel1.appendChild(kickWrap);
+
+  // Upload foto latar (hero image) — dipakai khusus di poster Klasemen gaya baru.
+  const heroWrap = h('div', {style:{marginBottom:'18px'}});
+  heroWrap.appendChild(h('label', {class:'form-label'}, 'Foto Latar Poster Klasemen (opsional, gaya "hero image")'));
+  const heroPreviewRow = h('div', {class:'flex items-center gap-3'});
+  const heroPreview = t.heroImageUrl
+    ? h('img', {src:t.heroImageUrl, style:{height:'64px', width:'100px', objectFit:'cover', borderRadius:'10px', background:'rgba(0,0,0,.15)'}})
+    : h('div', {class:'text-xs muted', style:{height:'64px', width:'100px', display:'flex', alignItems:'center', justifyContent:'center', border:'1px dashed var(--border)', borderRadius:'10px'}}, 'Belum ada');
+  heroPreviewRow.appendChild(heroPreview);
+  const heroUploadBtn = h('button', {class:'btn btn-ghost-blue', type:'button', onclick:function(e){
+    e.preventDefault(); e.stopPropagation();
+    pickImageFile(function(file){
+      compressImageFile(file, function(dataUrl, errMsg){
+        if (!dataUrl){ alert(errMsg || 'Gagal memuat gambar.'); return; }
+        T().heroImageUrl = dataUrl;
+        render();
+      }, BANNER_MAX_PX, BANNER_QUALITY);
+    });
+  }}, [icon('camera',13), t.heroImageUrl ? 'Ganti Foto' : 'Upload Foto']);
+  heroPreviewRow.appendChild(heroUploadBtn);
+  if (t.heroImageUrl){
+    heroPreviewRow.appendChild(h('button', {class:'icon-btn', onclick:function(){ T().heroImageUrl=null; render(); }}, icon('x',14)));
+  }
+  heroWrap.appendChild(heroPreviewRow);
+  heroWrap.appendChild(h('p', {class:'text-xs muted', style:{margin:'6px 0 0'}}, 'Foto pemain/aksi pertandingan buat latar bagian atas poster Klasemen. Kalau tidak diisi, poster pakai latar polos seperti biasa.'));
+  panel1.appendChild(heroWrap);
 
   panel1.appendChild(h('div', {}, [h('label',{class:'form-label'},'Logo / Emoji Turnamen'), (function(){
     const g = h('div', {class:'emoji-grid'});
