@@ -989,6 +989,7 @@ function buildSidebar(t){
     if (!state.adminMode){
       if (FIREBASE_ENABLED && !fbUser){ state.showAdminLogin = true; render(); return; }
       state.adminMode = true; render();
+      forceRefreshFromServer().then(function(){ render(); });
     } else {
       state.adminMode = false; render();
     }
@@ -3249,6 +3250,7 @@ function buildAdminLoginModal(){
     firebase.auth().signInWithEmailAndPassword(form.email.trim(), form.password)
       .then(function(){
         state.showAdminLogin = false; state.adminMode = true; render();
+        forceRefreshFromServer().then(function(){ render(); });
       })
       .catch(function(err){
         submitBtn.disabled = false; submitBtn.innerHTML = ''; submitBtn.appendChild(icon('sparkles',16)); submitBtn.appendChild(document.createTextNode(' Masuk'));
@@ -4349,6 +4351,17 @@ const FB_DOC = 'sharedState';
 const FIREBASE_ENABLED = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf('GANTI') === -1);
 
 let fbDb = null, fbReady = false, fbApplyingRemote = false, fbSaveTimer = null;
+// Tarik ulang data TERKINI dari server secara paksa (di luar jadwal poll 4 detik biasa) —
+// dipakai saat mode admin baru diaktifkan, supaya kalau tab ini sempat lama menganggur
+// (ketinggalan update dari device lain), datanya disegarkan dulu SEBELUM admin mulai ngedit.
+// Ini mengurangi risiko tab yang basi menulis ulang data lama begitu admin melakukan
+// perubahan apa pun di sini.
+function forceRefreshFromServer(){
+  if (!FIREBASE_ENABLED || !fbDb) return Promise.resolve();
+  return fbDb.collection(FB_COLLECTION).doc(FB_DOC).get().then(function(snap){
+    if (snap.exists) safeApplySnapshot(snap.data());
+  }).catch(function(err){ console.error('Gagal menyegarkan data sebelum mode admin aktif:', err); });
+}
 let fbStatus = FIREBASE_ENABLED ? 'connecting' : 'disabled';
 let fbUser = null;
 
