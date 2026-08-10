@@ -3106,47 +3106,50 @@ function recalculateBestGK(t){
 
 function buildPlayerStatsPanel(t){
   const panel = h('div', {class:'panel'});
-  const addScorerBtn = state.adminMode ? h('button', {class:'icon-btn', style:{color:'#60a5fa'}, onclick:function(){ t.topScorers.push({id:nextId(),name:'Pemain Baru',team:'Tim',goals:0}); render(); }}, icon('plus',14)) : null;
+  const addScorerBtn = state.adminMode ? h('button', {class:'icon-btn', style:{color:'#60a5fa'}, onclick:function(){ T().topScorers.push({id:nextId(),name:'Pemain Baru',team:'Tim',goals:0}); render(); }}, icon('plus',14)) : null;
   panel.appendChild(sectionTitle('star', 'Statistik Pemain'));
 
   const cols = h('div', {class:'two-col'});
+
+  function findLiveScorer(id){ return T().topScorers.find(function(x){return x.id===id;}); }
+  function findLiveGK(id){ return T().bestGK.find(function(x){return x.id===id;}); }
 
   const colA = h('div');
   colA.appendChild(h('div', {class:'flex items-center justify-between mb-3'}, [h('p',{class:'text-xs muted uppercase'},'Top Scorers'), addScorerBtn]));
   const listA = h('div', {class:'player-list'});
   t.topScorers.slice().sort(function(a,b){ return (b.goals||0)-(a.goals||0); }).forEach(function(p){
-    const i = t.topScorers.indexOf(p);
+    const pid = p.id;
     const row = h('div', {class:'player-row'}, [
       h('div', {class:'avatar-circle avatar-blue'}, initials(p.name)),
       h('div', {class:'flex-col min-w-0', style:{flex:1}}, [
-        editableText(function(){return p.name;}, function(v){p.name=v;}, 'font-medium'),
-        editableText(function(){return p.team;}, function(v){p.team=v;}, 'text-xs muted')
+        editableText(function(){ const lp=findLiveScorer(pid); return lp?lp.name:p.name; }, function(v){ const lp=findLiveScorer(pid); if(lp) lp.name=v; }, 'font-medium'),
+        editableText(function(){ const lp=findLiveScorer(pid); return lp?lp.team:p.team; }, function(v){ const lp=findLiveScorer(pid); if(lp) lp.team=v; }, 'text-xs muted')
       ]),
-      h('div', {class:'flex items-center gap-1', style:{color:'#93c5fd', fontWeight:'700'}}, [editableNumber(function(){return p.goals;}, function(v){p.goals=v;}, ''), h('span',{class:'text-xs muted'},'gol')]),
-      state.adminMode ? h('button', {class:'icon-btn', onclick:function(){ t.topScorers.splice(i,1); render(); }}, icon('x',13)) : null
+      h('div', {class:'flex items-center gap-1', style:{color:'#93c5fd', fontWeight:'700'}}, [editableNumber(function(){ const lp=findLiveScorer(pid); return lp?lp.goals:p.goals; }, function(v){ const lp=findLiveScorer(pid); if(lp) lp.goals=v; }, ''), h('span',{class:'text-xs muted'},'gol')]),
+      state.adminMode ? h('button', {class:'icon-btn', onclick:function(){ const liveT=T(); liveT.topScorers = liveT.topScorers.filter(function(x){return x.id!==pid;}); render(); }}, icon('x',13)) : null
     ]);
     listA.appendChild(row);
   });
   if (t.topScorers.length===0) listA.appendChild(h('p',{class:'text-xs muted'},'Belum ada data pencetak gol.'));
   colA.appendChild(listA);
 
-  const addGkBtn = state.adminMode ? h('button', {class:'icon-btn', style:{color:'#c084fc'}, onclick:function(){ t.bestGK.push({id:nextId(),name:'Kiper Baru',team:'Tim',cleanSheets:0}); render(); }}, icon('plus',14)) : null;
+  const addGkBtn = state.adminMode ? h('button', {class:'icon-btn', style:{color:'#c084fc'}, onclick:function(){ T().bestGK.push({id:nextId(),name:'Kiper Baru',team:'Tim',cleanSheets:0}); render(); }}, icon('plus',14)) : null;
   const recalcGkBtn = state.adminMode ? h('button', {class:'icon-btn', title:'Hitung ulang dari hasil pertandingan (pakai posisi kiper terkini)', onclick:function(){
-    recalculateBestGK(t); render();
+    recalculateBestGK(T()); render();
   }}, icon('refresh',13)) : null;
   const colB = h('div');
   colB.appendChild(h('div', {class:'flex items-center justify-between mb-3'}, [h('p',{class:'text-xs muted uppercase'},'Best Goalkeepers'), h('div',{class:'flex gap-1'},[recalcGkBtn, addGkBtn])]));
   const listB = h('div', {class:'player-list'});
   t.bestGK.slice().sort(function(a,b){ return (b.cleanSheets||0)-(a.cleanSheets||0); }).forEach(function(p){
-    const i = t.bestGK.indexOf(p);
+    const pid = p.id;
     const row = h('div', {class:'player-row'}, [
       h('div', {class:'avatar-circle avatar-purple'}, initials(p.name)),
       h('div', {class:'flex-col min-w-0', style:{flex:1}}, [
-        editableText(function(){return p.name;}, function(v){p.name=v;}, 'font-medium'),
-        editableText(function(){return p.team;}, function(v){p.team=v;}, 'text-xs muted')
+        editableText(function(){ const lp=findLiveGK(pid); return lp?lp.name:p.name; }, function(v){ const lp=findLiveGK(pid); if(lp) lp.name=v; }, 'font-medium'),
+        editableText(function(){ const lp=findLiveGK(pid); return lp?lp.team:p.team; }, function(v){ const lp=findLiveGK(pid); if(lp) lp.team=v; }, 'text-xs muted')
       ]),
-      h('div', {class:'flex items-center gap-1', style:{color:'#d8b4fe', fontWeight:'700'}}, [editableNumber(function(){return p.cleanSheets;}, function(v){p.cleanSheets=v;}, ''), h('span',{class:'text-xs muted'},'CS')]),
-      state.adminMode ? h('button', {class:'icon-btn', onclick:function(){ t.bestGK.splice(i,1); render(); }}, icon('x',13)) : null
+      h('div', {class:'flex items-center gap-1', style:{color:'#d8b4fe', fontWeight:'700'}}, [editableNumber(function(){ const lp=findLiveGK(pid); return lp?lp.cleanSheets:p.cleanSheets; }, function(v){ const lp=findLiveGK(pid); if(lp) lp.cleanSheets=v; }, ''), h('span',{class:'text-xs muted'},'CS')]),
+      state.adminMode ? h('button', {class:'icon-btn', onclick:function(){ const liveT=T(); liveT.bestGK = liveT.bestGK.filter(function(x){return x.id!==pid;}); render(); }}, icon('x',13)) : null
     ]);
     listB.appendChild(row);
   });
@@ -3239,14 +3242,20 @@ function buildTeamsPage(t){
   panel1.appendChild(sectionTitle('users', 'Tim Peserta ('+t.teams.length+')', teamBtnGroup));
   const grid = h('div', {class:'team-grid'});
   t.teams.forEach(function(team){
+    const teamId = team.id;
     const card = h('div', {class:'team-card' + (state.selectedTeamId===team.id?' selected':''), onclick:function(){ state.selectedTeamId=team.id; render(); }});
     if (state.adminMode){
-      card.appendChild(h('button', {class:'team-card-remove', onclick:function(e){ e.stopPropagation(); t.teams = t.teams.filter(function(x){return x.id!==team.id;}); if(state.selectedTeamId===team.id) state.selectedTeamId=null; render(); }}, icon('x',13)));
+      card.appendChild(h('button', {class:'team-card-remove', onclick:function(e){
+        e.stopPropagation();
+        const liveT = T();
+        liveT.teams = liveT.teams.filter(function(x){return x.id!==teamId;});
+        if(state.selectedTeamId===teamId) state.selectedTeamId=null;
+        render();
+      }}, icon('x',13)));
     }
     const crestWrap = h('div', {style:{position:'relative'}});
     crestWrap.appendChild(team.logoUrl ? h('img',{src:team.logoUrl, class:'team-crest-lg', style:{objectFit:'cover'}}) : h('div', {class:'team-crest-lg', style:{background:GRAD_CSS[team.color]||GRAD_CSS['grad-blue']}}, team.emoji||'⚽'));
     if (state.adminMode){
-      const teamId = team.id;
       const uploadBtn = h('button', {class:'logo-upload-btn', type:'button', title:'Ganti logo tim', onclick:function(e){
         e.stopPropagation(); e.preventDefault();
         pickImageFile(function(file){
@@ -3267,7 +3276,11 @@ function buildTeamsPage(t){
     card.appendChild(crestWrap);
     const nameSpan = h('span', {class:'font-semibold text-sm truncate', style:{textAlign:'center', maxWidth:'100%'}});
     if (state.adminMode){
-      const editableName = editableText(function(){return team.name;}, function(v){team.name=v;}, 'font-semibold text-sm');
+      const editableName = editableText(
+        function(){ const lt=T().teams.find(function(x){return x.id===teamId;}); return lt?lt.name:team.name; },
+        function(v){ const lt=T().teams.find(function(x){return x.id===teamId;}); if(lt) lt.name=v; },
+        'font-semibold text-sm'
+      );
       editableName.addEventListener('click', function(e){ e.stopPropagation(); });
       card.appendChild(editableName);
     } else {
@@ -3284,7 +3297,12 @@ function buildTeamsPage(t){
   if (selected){
     const panel2 = h('div', {class:'panel'});
     const addPlayerBtn = state.adminMode ? h('button', {class:'btn btn-ghost-purple', onclick:function(){
-      selected.players.push({id:nextId(), name:'Pemain Baru', number:selected.players.length+1, position:'MF'}); render();
+      // Pakai T() (data terkini) — kalau halaman ini sempat dibiarkan terbuka lama sebelum
+      // tombol ini diklik, sinkronisasi latar belakang bisa saja mengganti objek tim.
+      const liveTeam = T().teams.find(function(x){return x.id===selected.id;});
+      if (!liveTeam) return;
+      liveTeam.players.push({id:nextId(), name:'Pemain Baru', number:liveTeam.players.length+1, position:'MF'});
+      render();
     }}, [icon('plus',13), 'Tambah Pemain']) : null;
     panel2.appendChild(sectionTitle('userplus', 'Skuad ' + selected.name, addPlayerBtn));
 
@@ -3293,15 +3311,32 @@ function buildTeamsPage(t){
       h('thead', {}, h('tr', {}, [h('th',{},'No'), h('th',{},'Nama Pemain'), h('th',{style:{textAlign:'center'}},'Posisi'), state.adminMode?h('th',{}):null]))
     ]);
     const tbody = h('tbody');
+    // Cari ulang tim & pemain dari data TERKINI (bukan objek `selected`/`p` yang ditangkap
+    // waktu halaman ini dirender) — supaya edit nomor/nama/posisi tidak nyasar ke objek yang
+    // sudah dibuang kalau sinkronisasi latar belakang mengganti data sementara halaman ini
+    // dibiarkan terbuka.
+    function findLivePlayer(teamId, playerId){
+      const liveTeam = T().teams.find(function(x){return x.id===teamId;});
+      return liveTeam ? liveTeam.players.find(function(x){return x.id===playerId;}) : null;
+    }
     selected.players.forEach(function(p){
+      const teamId = selected.id, playerId = p.id;
       const tr = h('tr');
-      tr.appendChild(h('td', {}, editableNumber(function(){return p.number;}, function(v){p.number=v;}, 'font-bold')));
-      tr.appendChild(h('td', {}, editableText(function(){return p.name;}, function(v){p.name=v;}, 'font-medium')));
+      tr.appendChild(h('td', {}, editableNumber(
+        function(){ const lp=findLivePlayer(teamId,playerId); return lp?lp.number:p.number; },
+        function(v){ const lp=findLivePlayer(teamId,playerId); if(lp) lp.number=v; },
+        'font-bold'
+      )));
+      tr.appendChild(h('td', {}, editableText(
+        function(){ const lp=findLivePlayer(teamId,playerId); return lp?lp.name:p.name; },
+        function(v){ const lp=findLivePlayer(teamId,playerId); if(lp) lp.name=v; },
+        'font-medium'
+      )));
       let posCell;
       if (state.adminMode){
         const sel = h('select', {class:'form-input', style:{width:'auto', padding:'5px 8px', fontSize:'12px'}}, POSITIONS.map(function(pos){ return h('option',{value:pos, selected:p.position===pos?true:undefined}, pos); }));
         sel.value = p.position;
-        sel.addEventListener('change', function(e){ p.position=e.target.value; render(); });
+        sel.addEventListener('change', function(e){ const lp=findLivePlayer(teamId,playerId); if(lp){ lp.position=e.target.value; } render(); });
         posCell = h('td', {style:{textAlign:'center'}}, sel);
       } else {
         posCell = h('td', {style:{textAlign:'center'}}, h('span',{class:'text-xs muted'},p.position));
@@ -3309,8 +3344,12 @@ function buildTeamsPage(t){
       tr.appendChild(posCell);
       if (state.adminMode){
         const actionsCell = h('td', {style:{textAlign:'right', whiteSpace:'nowrap'}});
-        actionsCell.appendChild(h('button',{class:'icon-btn', title:'Edit pemain', onclick:function(){ state.showEditPlayer = {teamId:selected.id, playerId:p.id}; render(); }}, icon('pencil',14)));
-        actionsCell.appendChild(h('button',{class:'icon-btn', title:'Hapus pemain', onclick:function(){ selected.players = selected.players.filter(function(x){return x.id!==p.id;}); render(); }}, icon('trash',14)));
+        actionsCell.appendChild(h('button',{class:'icon-btn', title:'Edit pemain', onclick:function(){ state.showEditPlayer = {teamId:teamId, playerId:playerId}; render(); }}, icon('pencil',14)));
+        actionsCell.appendChild(h('button',{class:'icon-btn', title:'Hapus pemain', onclick:function(){
+          const liveTeam = T().teams.find(function(x){return x.id===teamId;});
+          if (liveTeam) liveTeam.players = liveTeam.players.filter(function(x){return x.id!==playerId;});
+          render();
+        }}, icon('trash',14)));
         tr.appendChild(actionsCell);
       }
       tbody.appendChild(tr);
