@@ -2763,9 +2763,9 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
 }
 
 /* ---------- KLASEMEN GRUP POSTER (gaya baru: foto latar/hero + baris klasemen kapsul) ---------- */
-async function drawKlasemenPoster(t, canvas, groupLabel, teams){
+async function drawKlasemenPoster(t, canvas, groupLabel, teams, heroImageUrl){
   const W = 1080;
-  const hasHero = !!t.heroImageUrl;
+  const hasHero = !!heroImageUrl;
   const hasSponsor = !!t.sponsorLogoUrl;
   const heroH = hasHero ? 560 : 0;
   const dateH = 60;
@@ -2784,7 +2784,7 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams){
 
   const logoImg = await loadImgAsync(t.logoImageUrl);
   const kickImg = await loadImgAsync(t.kickIconUrl);
-  const heroImg = hasHero ? await loadImgAsync(t.heroImageUrl) : null;
+  const heroImg = hasHero ? await loadImgAsync(heroImageUrl) : null;
 
   let cursorY = topPad;
 
@@ -2895,12 +2895,21 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams){
 
   teams.forEach(function(tm, i){
     const rowY = cursorY, rcy = rowY+rowH/2;
-    // kapsul — warna emas identik poster Hasil Pertandingan, sedikit lebih terang buat juara grup
+    // kapsul — putih buat tim biasa, disorot emas cuma buat juara grup (peringkat 1)
     drawRoundedRect(ctx, tableX, rowY, tableW, rowH, rowH/2);
-    const rowGrad = ctx.createLinearGradient(tableX,rowY,tableX+tableW,rowY);
-    if (i===0){ rowGrad.addColorStop(0,'#f9c94a'); rowGrad.addColorStop(1,'#e0a520'); }
-    else { rowGrad.addColorStop(0,'#f5b400'); rowGrad.addColorStop(1,'#d99a06'); }
-    ctx.fillStyle = rowGrad; ctx.fill();
+    if (i===0){
+      const rowGrad = ctx.createLinearGradient(tableX,rowY,tableX+tableW,rowY);
+      rowGrad.addColorStop(0,'#fdf1cf'); rowGrad.addColorStop(1,'#f7dfa0');
+      ctx.fillStyle = rowGrad;
+    } else {
+      ctx.fillStyle = '#f4f2ee';
+    }
+    ctx.fill();
+    if (i===0){
+      ctx.save(); ctx.strokeStyle='rgba(230,170,40,.7)'; ctx.lineWidth=2.5;
+      drawRoundedRect(ctx, tableX+1.5, rowY+1.5, tableW-3, rowH-3, rowH/2-1.5); ctx.stroke();
+      ctx.restore();
+    }
 
     // badge posisi
     const badgeR = 20, badgeCx = colX.pos+(tableW*0.09)/2;
@@ -2954,9 +2963,47 @@ function buildKlasemenPosterModal(t){
   groupWrap.appendChild(h('label',{class:'form-label'},'Grup'));
   const groupSel = h('select', {class:'form-input'}, groupList.map(function(g){ return h('option',{value:g.id}, g.name); }));
   groupSel.value = cfg.groupId;
-  groupSel.addEventListener('change', function(e){ cfg.groupId = e.target.value==='null'?null:e.target.value; genPreview(); });
+  groupSel.addEventListener('change', function(e){ cfg.groupId = e.target.value==='null'?null:e.target.value; refreshHeroPreview(); genPreview(); });
   groupWrap.appendChild(groupSel);
   body.appendChild(groupWrap);
+
+  // Foto latar khusus buat grup yang lagi dipilih — tiap grup bisa punya foto beda-beda.
+  // Kalau grup ini belum punya foto sendiri, poster pakai foto latar default (Admin Settings), kalau ada.
+  const heroWrap = h('div', {});
+  heroWrap.appendChild(h('label', {class:'form-label'}, 'Foto Latar buat Grup Ini'));
+  const heroPreviewRow = h('div', {class:'flex items-center gap-3'});
+  const heroPreviewImg = h('img', {style:{height:'54px', width:'90px', objectFit:'cover', borderRadius:'8px', background:'rgba(0,0,0,.1)', display:'none'}});
+  const heroPreviewEmpty = h('div', {class:'text-xs muted', style:{height:'54px', width:'90px', display:'flex', alignItems:'center', justifyContent:'center', border:'1px dashed var(--border)', borderRadius:'8px'}}, 'Pakai default');
+  heroPreviewRow.appendChild(heroPreviewImg); heroPreviewRow.appendChild(heroPreviewEmpty);
+  function groupHeroUrl(){ return (t.groupHeroImages && t.groupHeroImages[cfg.groupId]) || null; }
+  function refreshHeroPreview(){
+    const url = groupHeroUrl();
+    if (url){ heroPreviewImg.src = url; heroPreviewImg.style.display='block'; heroPreviewEmpty.style.display='none'; }
+    else { heroPreviewImg.style.display='none'; heroPreviewEmpty.style.display='flex'; }
+  }
+  refreshHeroPreview();
+  const heroUploadBtn = h('button', {class:'btn btn-ghost-blue', type:'button', style:{fontSize:'12px'}, onclick:function(e){
+    e.preventDefault(); e.stopPropagation();
+    const gid = cfg.groupId;
+    pickImageFile(function(file){
+      compressImageFile(file, function(dataUrl, errMsg){
+        if (!dataUrl){ alert(errMsg || 'Gagal memuat gambar.'); return; }
+        const liveT = T();
+        if (!liveT.groupHeroImages) liveT.groupHeroImages = {};
+        liveT.groupHeroImages[gid] = dataUrl;
+        refreshHeroPreview(); genPreview(); render();
+      }, BANNER_MAX_PX, BANNER_QUALITY);
+    });
+  }}, [icon('camera',12), 'Upload/Ganti']);
+  heroPreviewRow.appendChild(heroUploadBtn);
+  const heroRemoveBtn = h('button', {class:'icon-btn', onclick:function(){
+    const liveT = T();
+    if (liveT.groupHeroImages) delete liveT.groupHeroImages[cfg.groupId];
+    refreshHeroPreview(); genPreview(); render();
+  }}, icon('x',13));
+  heroPreviewRow.appendChild(heroRemoveBtn);
+  heroWrap.appendChild(heroPreviewRow);
+  body.appendChild(heroWrap);
 
   const previewWrap = h('div', {style:{textAlign:'center', background:'var(--surface-2)', borderRadius:'10px', padding:'10px', minHeight:'120px', display:'flex', alignItems:'center', justifyContent:'center'}});
   const statusMsg = h('p', {class:'text-xs muted', style:{margin:'0', textAlign:'center'}}, 'Memuat pratinjau…');
@@ -2974,8 +3021,9 @@ function buildKlasemenPosterModal(t){
     }
     statusMsg.textContent = 'Memuat pratinjau…';
     const groupName = (t.groups.find(function(g){return g.id===cfg.groupId;})||{}).name || 'SEMUA TIM';
+    const heroUrl = groupHeroUrl() || t.heroImageUrl || null;
     const canvas = document.createElement('canvas');
-    drawKlasemenPoster(t, canvas, groupName, teams).then(function(){
+    drawKlasemenPoster(t, canvas, groupName, teams, heroUrl).then(function(){
       currentCanvas = canvas;
       previewWrap.innerHTML = '';
       previewWrap.appendChild(h('img', {src:canvas.toDataURL('image/png'), style:{maxWidth:'100%', borderRadius:'8px', display:'block', margin:'0 auto'}}));
