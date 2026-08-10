@@ -1333,10 +1333,13 @@ function editableNumber(getVal, setVal, className, opts){
    maupun kuota localStorage — akibatnya penyimpanan gagal diam-diam dan logo
    "hilang" lagi. Jadi setiap gambar di-resize ke kotak kecil dan dikompres
    ke JPEG dulu, hasilnya cuma belasan KB per logo. */
-const LOGO_MAX_PX = 220;      // sisi terpanjang logo setelah di-resize
-const LOGO_QUALITY = 0.76;    // kualitas JPEG (0-1)
+const LOGO_MAX_PX = 220;      // sisi terpanjang logo (bulat/tim) setelah di-resize
+const LOGO_QUALITY = 0.76;    // kualitas JPEG buat logo bulat (0-1)
+const BANNER_MAX_PX = 900;    // sisi terpanjang buat gambar lebar (mis. strip logo sponsor)
+const BANNER_QUALITY = 0.82;  // kualitas JPEG buat strip logo (banyak logo kecil, perlu lebih tajam)
 
-function compressImageFile(file, cb){
+function compressImageFile(file, cb, maxPx, quality){
+  maxPx = maxPx || LOGO_MAX_PX; quality = quality || LOGO_QUALITY;
   console.log('[compressImageFile] mulai. File:', file && file.name, file && file.type, file && Math.round((file.size||0)/1024)+'KB');
   if (!file || !/^image\//.test(file.type)){ console.warn('[compressImageFile] ditolak: bukan file gambar'); cb(null, 'File yang dipilih bukan gambar.'); return; }
   const reader = new FileReader();
@@ -1350,7 +1353,7 @@ function compressImageFile(file, cb){
       let w = img.naturalWidth || img.width;
       let h = img.naturalHeight || img.height;
       if (!w || !h){ console.warn('[compressImageFile] dimensi tidak terbaca'); cb(null, 'Ukuran gambar tidak terbaca.'); return; }
-      const scale = Math.min(1, LOGO_MAX_PX / Math.max(w, h));
+      const scale = Math.min(1, maxPx / Math.max(w, h));
       w = Math.max(1, Math.round(w * scale));
       h = Math.max(1, Math.round(h * scale));
       const canvas = document.createElement('canvas');
@@ -1361,7 +1364,7 @@ function compressImageFile(file, cb){
       ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
       try{
-        const out = canvas.toDataURL('image/jpeg', LOGO_QUALITY);
+        const out = canvas.toDataURL('image/jpeg', quality);
         console.log('[compressImageFile] SUKSES. Hasil kompres:', w+'x'+h, Math.round(out.length/1024)+'KB');
         cb(out, null);
       } catch(err){
@@ -2569,11 +2572,21 @@ function removeDarkBackground(img, threshold){
   cx.putImageData(data, 0, 0);
   return c;
 }
+// Gambar strip logo sponsor/partner, di-skala biar pas lebar poster tanpa gepeng, dengan
+// tinggi maksimal supaya tidak makan terlalu banyak ruang di poster.
+function drawSponsorStrip(ctx, img, W, y, maxH){
+  const iw = img.naturalWidth || img.width || 1, ih = img.naturalHeight || img.height || 1;
+  const maxW = W - 160;
+  let dw = maxW, dh = dw * (ih/iw);
+  if (dh > maxH){ dh = maxH; dw = dh * (iw/ih); }
+  ctx.drawImage(img, W/2 - dw/2, y, dw, dh);
+}
 async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   const W = 1080;
   const rowH = 128, rowGap = 24;
   const headerH = 560;
-  const footerH = 130;
+  const hasSponsor = !!t.sponsorLogoUrl;
+  const footerH = 130 + (hasSponsor ? 100 : 0);
   const H = headerH + matches.length*(rowH+rowGap) + footerH;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -2655,6 +2668,11 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
     y += barH+rowGap;
   });
 
+  if (hasSponsor){
+    const sponsorImg = await loadImgAsync(t.sponsorLogoUrl);
+    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-130-90, 80);
+  }
+
   ctx.textAlign='center'; ctx.font='600 24px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
   if (t.igHandle){
     const igText = t.igHandle.replace(/^@/,'');
@@ -2682,7 +2700,8 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams){
   const W = 1080;
   const rowH = 84, headHeight = 70;
   const headerH = 560;
-  const footerH = 110;
+  const hasSponsor = !!t.sponsorLogoUrl;
+  const footerH = 110 + (hasSponsor ? 100 : 0);
   const H = headerH + headHeight + teams.length*rowH + footerH;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -2793,6 +2812,11 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams){
 
     y += rowH;
   });
+
+  if (hasSponsor){
+    const sponsorImg = await loadImgAsync(t.sponsorLogoUrl);
+    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-110-90, 80);
+  }
 
   ctx.textAlign='center'; ctx.font='600 24px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
   if (t.igHandle){
@@ -3570,8 +3594,42 @@ function buildAdminSettingsPage(t){
 
   const igWrap = h('div', {style:{marginBottom:'18px'}});
   igWrap.appendChild(h('label', {class:'form-label'}, 'Instagram (buat poster Match Result)'));
-  igWrap.appendChild(editableText(function(){return t.igHandle||'';}, function(v){t.igHandle=v;}, 'form-input text-wide'));
+  igWrap.appendChild(editableText(
+    function(){ return T().igHandle||''; },
+    function(v){ T().igHandle=v; },
+    'form-input text-wide'
+  ));
   panel1.appendChild(igWrap);
+
+  // Upload strip logo sponsor/partner — ditampilkan di bagian paling bawah poster
+  // Match Result & Klasemen, di atas handle Instagram.
+  const sponsorWrap = h('div', {style:{marginBottom:'18px'}});
+  sponsorWrap.appendChild(h('label', {class:'form-label'}, 'Logo Sponsor/Partner (strip gambar, tampil di bawah poster)'));
+  const sponsorPreviewRow = h('div', {class:'flex items-center gap-3'});
+  const sponsorPreview = t.sponsorLogoUrl
+    ? h('img', {src:t.sponsorLogoUrl, style:{height:'50px', maxWidth:'220px', objectFit:'contain', borderRadius:'8px', background:'rgba(0,0,0,.15)'}})
+    : h('div', {class:'text-xs muted', style:{height:'50px', width:'120px', display:'flex', alignItems:'center', justifyContent:'center', border:'1px dashed var(--border)', borderRadius:'8px'}}, 'Belum ada');
+  sponsorPreviewRow.appendChild(sponsorPreview);
+  const sponsorUploadBtn = h('button', {class:'btn btn-ghost-blue', type:'button', onclick:function(e){
+    e.preventDefault(); e.stopPropagation();
+    pickImageFile(function(file){
+      compressImageFile(file, function(dataUrl, errMsg){
+        if (!dataUrl){ alert(errMsg || 'Gagal memuat gambar.'); return; }
+        // Pakai T() (data terkini), bukan `t` yang ditangkap waktu tombol ini dibuat — sama
+        // seperti logo turnamen, supaya tidak nyasar ke objek yang sudah dibuang kalau
+        // sinkronisasi latar belakang jalan sementara lo lagi milih file di galeri.
+        T().sponsorLogoUrl = dataUrl;
+        render();
+      }, BANNER_MAX_PX, BANNER_QUALITY);
+    });
+  }}, [icon('camera',13), t.sponsorLogoUrl ? 'Ganti Gambar' : 'Upload Gambar']);
+  sponsorPreviewRow.appendChild(sponsorUploadBtn);
+  if (t.sponsorLogoUrl){
+    sponsorPreviewRow.appendChild(h('button', {class:'icon-btn', onclick:function(){ T().sponsorLogoUrl=null; render(); }}, icon('x',14)));
+  }
+  sponsorWrap.appendChild(sponsorPreviewRow);
+  sponsorWrap.appendChild(h('p', {class:'text-xs muted', style:{margin:'6px 0 0'}}, 'Upload satu gambar berisi semua logo brand yang disusun berjejer (kayak strip logo yang sudah lo desain).'));
+  panel1.appendChild(sponsorWrap);
 
   panel1.appendChild(h('div', {}, [h('label',{class:'form-label'},'Logo / Emoji Turnamen'), (function(){
     const g = h('div', {class:'emoji-grid'});
