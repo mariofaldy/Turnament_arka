@@ -2573,16 +2573,20 @@ function removeDarkBackground(img, threshold){
   return c;
 }
 // Gambar strip logo sponsor/partner, di-skala biar pas lebar poster tanpa gepeng, dengan
-// tinggi maksimal supaya tidak makan terlalu banyak ruang di poster. Background gelap/hitam
-// pada gambar sponsor dihilangkan dulu (chroma-key) sama seperti logo turnamen, supaya yang
-// keliatan cuma logo-logo brand-nya, menyatu sama background poster.
-function drawSponsorStrip(ctx, img, W, y, maxH){
-  const cleaned = removeDarkBackground(img, 38);
-  const iw = cleaned.width || 1, ih = cleaned.height || 1;
-  const maxW = W - 80;
+function fitSize(iw, ih, maxW, maxH){
   let dw = maxW, dh = dw * (ih/iw);
   if (dh > maxH){ dh = maxH; dw = dh * (iw/ih); }
-  ctx.drawImage(cleaned, W/2 - dw/2, y, dw, dh);
+  return {dw:dw, dh:dh};
+}
+// tinggi maksimal supaya tidak makan terlalu banyak ruang di poster. Background gelap/hitam
+// pada gambar sponsor dihilangkan dulu (chroma-key) sama seperti logo turnamen, supaya yang
+// keliatan cuma logo-logo brand-nya, menyatu sama background poster. `yCenter` adalah titik
+// tengah vertikal area yang tersedia — gambar di-center pas di situ (bukan nempel ke bawah),
+// supaya jarak ke baris di atasnya dan ke tepi bawah poster seimbang.
+function drawSponsorStrip(ctx, img, W, yCenter, maxW, maxH){
+  const cleaned = removeDarkBackground(img, 38);
+  const size = fitSize(cleaned.width||1, cleaned.height||1, maxW, maxH);
+  ctx.drawImage(cleaned, W/2 - size.dw/2, yCenter - size.dh/2, size.dw, size.dh);
 }
 async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   const W = 1080;
@@ -2673,7 +2677,7 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
 
   if (hasSponsor){
     const sponsorImg = await loadImgAsync(t.sponsorLogoUrl);
-    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-190+30, 150);
+    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-footerH/2, W-80, footerH-30);
   } else {
     ctx.textAlign='center'; ctx.font='600 24px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
     ctx.textBaseline='alphabetic';
@@ -2801,7 +2805,7 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams){
 
   if (hasSponsor){
     const sponsorImg = await loadImgAsync(t.sponsorLogoUrl);
-    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-190+30, 150);
+    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-footerH/2, W-80, footerH-30);
   } else {
     ctx.textAlign='center'; ctx.font='600 24px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
     ctx.textBaseline='alphabetic';
