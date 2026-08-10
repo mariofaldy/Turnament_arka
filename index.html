@@ -2972,50 +2972,55 @@ function buildKlasemenPosterModal(t){
 
   // Foto latar khusus buat grup yang lagi dipilih — tiap grup bisa punya foto beda-beda.
   // Kalau grup ini belum punya foto sendiri, poster pakai foto latar default (Admin Settings), kalau ada.
-  const heroWrap = h('div', {});
-  heroWrap.appendChild(h('label', {class:'form-label'}, 'Foto Latar buat Grup Ini'));
-  const heroPreviewRow = h('div', {class:'flex items-center gap-3'});
-  const heroPreviewImg = h('img', {style:{height:'54px', width:'90px', objectFit:'cover', borderRadius:'8px', background:'rgba(0,0,0,.1)', display:'none'}});
-  const heroPreviewEmpty = h('div', {class:'text-xs muted', style:{height:'54px', width:'90px', display:'flex', alignItems:'center', justifyContent:'center', border:'1px dashed var(--border)', borderRadius:'8px'}}, 'Pakai default');
-  heroPreviewRow.appendChild(heroPreviewImg); heroPreviewRow.appendChild(heroPreviewEmpty);
+  // KHUSUS ADMIN — pengunjung biasa cuma boleh generate & download poster, bukan ngubah datanya.
   function groupHeroUrl(){ return (t.groupHeroImages && t.groupHeroImages[cfg.groupId]) || null; }
-  function refreshHeroPreview(){
-    const url = groupHeroUrl();
-    if (url){ heroPreviewImg.src = url; heroPreviewImg.style.display='block'; heroPreviewEmpty.style.display='none'; }
-    else { heroPreviewImg.style.display='none'; heroPreviewEmpty.style.display='flex'; }
+  let refreshHeroPreview = function(){};
+  let refreshSizeIndicator = function(){};
+  if (state.adminMode){
+    const heroWrap = h('div', {});
+    heroWrap.appendChild(h('label', {class:'form-label'}, 'Foto Latar buat Grup Ini'));
+    const heroPreviewRow = h('div', {class:'flex items-center gap-3'});
+    const heroPreviewImg = h('img', {style:{height:'54px', width:'90px', objectFit:'cover', borderRadius:'8px', background:'rgba(0,0,0,.1)', display:'none'}});
+    const heroPreviewEmpty = h('div', {class:'text-xs muted', style:{height:'54px', width:'90px', display:'flex', alignItems:'center', justifyContent:'center', border:'1px dashed var(--border)', borderRadius:'8px'}}, 'Pakai default');
+    heroPreviewRow.appendChild(heroPreviewImg); heroPreviewRow.appendChild(heroPreviewEmpty);
+    refreshHeroPreview = function(){
+      const url = groupHeroUrl();
+      if (url){ heroPreviewImg.src = url; heroPreviewImg.style.display='block'; heroPreviewEmpty.style.display='none'; }
+      else { heroPreviewImg.style.display='none'; heroPreviewEmpty.style.display='flex'; }
+    };
+    refreshHeroPreview();
+    const heroUploadBtn = h('button', {class:'btn btn-ghost-blue', type:'button', style:{fontSize:'12px'}, onclick:function(e){
+      e.preventDefault(); e.stopPropagation();
+      const gid = cfg.groupId;
+      pickImageFile(function(file){
+        compressImageFile(file, function(dataUrl, errMsg){
+          if (!dataUrl){ alert(errMsg || 'Gagal memuat gambar.'); return; }
+          const liveT = T();
+          if (!liveT.groupHeroImages) liveT.groupHeroImages = {};
+          liveT.groupHeroImages[gid] = dataUrl;
+          refreshHeroPreview(); refreshSizeIndicator(); genPreview(); render();
+        }, HERO_MAX_PX, HERO_QUALITY);
+      });
+    }}, [icon('camera',12), 'Upload/Ganti']);
+    heroPreviewRow.appendChild(heroUploadBtn);
+    const heroRemoveBtn = h('button', {class:'icon-btn', onclick:function(){
+      const liveT = T();
+      if (liveT.groupHeroImages) delete liveT.groupHeroImages[cfg.groupId];
+      refreshHeroPreview(); refreshSizeIndicator(); genPreview(); render();
+    }}, icon('x',13));
+    heroPreviewRow.appendChild(heroRemoveBtn);
+    heroWrap.appendChild(heroPreviewRow);
+    const sizeIndicator = h('p', {class:'text-xs', style:{margin:'6px 0 0'}});
+    heroWrap.appendChild(sizeIndicator);
+    refreshSizeIndicator = function(){
+      const kb = Math.round(new Blob([JSON.stringify(T())]).size/1024);
+      const warn = kb > 700;
+      sizeIndicator.style.color = warn ? 'var(--red)' : 'var(--text-4)';
+      sizeIndicator.textContent = 'Ukuran data turnamen saat ini: ~' + kb + ' KB' + (warn ? ' — sudah mendekati batas 1000 KB, foto latar tambahan bisa gagal tersimpan.' : '.');
+    };
+    refreshSizeIndicator();
+    body.appendChild(heroWrap);
   }
-  refreshHeroPreview();
-  const heroUploadBtn = h('button', {class:'btn btn-ghost-blue', type:'button', style:{fontSize:'12px'}, onclick:function(e){
-    e.preventDefault(); e.stopPropagation();
-    const gid = cfg.groupId;
-    pickImageFile(function(file){
-      compressImageFile(file, function(dataUrl, errMsg){
-        if (!dataUrl){ alert(errMsg || 'Gagal memuat gambar.'); return; }
-        const liveT = T();
-        if (!liveT.groupHeroImages) liveT.groupHeroImages = {};
-        liveT.groupHeroImages[gid] = dataUrl;
-        refreshHeroPreview(); refreshSizeIndicator(); genPreview(); render();
-      }, HERO_MAX_PX, HERO_QUALITY);
-    });
-  }}, [icon('camera',12), 'Upload/Ganti']);
-  heroPreviewRow.appendChild(heroUploadBtn);
-  const heroRemoveBtn = h('button', {class:'icon-btn', onclick:function(){
-    const liveT = T();
-    if (liveT.groupHeroImages) delete liveT.groupHeroImages[cfg.groupId];
-    refreshHeroPreview(); refreshSizeIndicator(); genPreview(); render();
-  }}, icon('x',13));
-  heroPreviewRow.appendChild(heroRemoveBtn);
-  heroWrap.appendChild(heroPreviewRow);
-  const sizeIndicator = h('p', {class:'text-xs', style:{margin:'6px 0 0'}});
-  heroWrap.appendChild(sizeIndicator);
-  function refreshSizeIndicator(){
-    const kb = Math.round(new Blob([JSON.stringify(T())]).size/1024);
-    const warn = kb > 700;
-    sizeIndicator.style.color = warn ? 'var(--red)' : 'var(--text-4)';
-    sizeIndicator.textContent = 'Ukuran data turnamen saat ini: ~' + kb + ' KB' + (warn ? ' — sudah mendekati batas 1000 KB, foto latar tambahan bisa gagal tersimpan.' : '.');
-  }
-  refreshSizeIndicator();
-  body.appendChild(heroWrap);
 
   const previewWrap = h('div', {style:{textAlign:'center', background:'var(--surface-2)', borderRadius:'10px', padding:'10px', minHeight:'120px', display:'flex', alignItems:'center', justifyContent:'center'}});
   const statusMsg = h('p', {class:'text-xs muted', style:{margin:'0', textAlign:'center'}}, 'Memuat pratinjau…');
