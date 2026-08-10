@@ -1337,6 +1337,8 @@ const LOGO_MAX_PX = 220;      // sisi terpanjang logo (bulat/tim) setelah di-res
 const LOGO_QUALITY = 0.76;    // kualitas JPEG buat logo bulat (0-1)
 const BANNER_MAX_PX = 900;    // sisi terpanjang buat gambar lebar (mis. strip logo sponsor)
 const BANNER_QUALITY = 0.82;  // kualitas JPEG buat strip logo (banyak logo kecil, perlu lebih tajam)
+const HERO_MAX_PX = 640;      // foto latar poster Klasemen — dikompres lebih ketat karena bisa
+const HERO_QUALITY = 0.68;    // ada satu per grup (menumpuk), dan sebagian besar ketutup gradasi gelap
 
 function compressImageFile(file, cb, maxPx, quality){
   maxPx = maxPx || LOGO_MAX_PX; quality = quality || LOGO_QUALITY;
@@ -2991,18 +2993,27 @@ function buildKlasemenPosterModal(t){
         const liveT = T();
         if (!liveT.groupHeroImages) liveT.groupHeroImages = {};
         liveT.groupHeroImages[gid] = dataUrl;
-        refreshHeroPreview(); genPreview(); render();
-      }, BANNER_MAX_PX, BANNER_QUALITY);
+        refreshHeroPreview(); refreshSizeIndicator(); genPreview(); render();
+      }, HERO_MAX_PX, HERO_QUALITY);
     });
   }}, [icon('camera',12), 'Upload/Ganti']);
   heroPreviewRow.appendChild(heroUploadBtn);
   const heroRemoveBtn = h('button', {class:'icon-btn', onclick:function(){
     const liveT = T();
     if (liveT.groupHeroImages) delete liveT.groupHeroImages[cfg.groupId];
-    refreshHeroPreview(); genPreview(); render();
+    refreshHeroPreview(); refreshSizeIndicator(); genPreview(); render();
   }}, icon('x',13));
   heroPreviewRow.appendChild(heroRemoveBtn);
   heroWrap.appendChild(heroPreviewRow);
+  const sizeIndicator = h('p', {class:'text-xs', style:{margin:'6px 0 0'}});
+  heroWrap.appendChild(sizeIndicator);
+  function refreshSizeIndicator(){
+    const kb = Math.round(new Blob([JSON.stringify(T())]).size/1024);
+    const warn = kb > 700;
+    sizeIndicator.style.color = warn ? 'var(--red)' : 'var(--text-4)';
+    sizeIndicator.textContent = 'Ukuran data turnamen saat ini: ~' + kb + ' KB' + (warn ? ' — sudah mendekati batas 1000 KB, foto latar tambahan bisa gagal tersimpan.' : '.');
+  }
+  refreshSizeIndicator();
   body.appendChild(heroWrap);
 
   const previewWrap = h('div', {style:{textAlign:'center', background:'var(--surface-2)', borderRadius:'10px', padding:'10px', minHeight:'120px', display:'flex', alignItems:'center', justifyContent:'center'}});
@@ -3879,7 +3890,7 @@ function buildAdminSettingsPage(t){
         if (!dataUrl){ alert(errMsg || 'Gagal memuat gambar.'); return; }
         T().heroImageUrl = dataUrl;
         render();
-      }, BANNER_MAX_PX, BANNER_QUALITY);
+      }, HERO_MAX_PX, HERO_QUALITY);
     });
   }}, [icon('camera',13), t.heroImageUrl ? 'Ganti Foto' : 'Upload Foto']);
   heroPreviewRow.appendChild(heroUploadBtn);
