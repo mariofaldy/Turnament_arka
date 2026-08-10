@@ -2642,7 +2642,7 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
       // Sandingkan logo turnamen dengan ikon pemain nendang bola (upload sendiri) di
       // sebelah kirinya — otomatis bikin logonya sedikit bergeser ke kanan dari tengah.
       const cleanedKick = recolorSilhouette(kickImg, '#ffffff', 40);
-      const iconH = lh*0.85, iconW = iconH * (cleanedKick.width/cleanedKick.height || 1);
+      const iconH = lh, iconW = iconH * (cleanedKick.width/cleanedKick.height || 1);
       const comboGap = 22;
       const comboW = iconW + comboGap + lw;
       const comboLeft = W/2 - comboW/2;
