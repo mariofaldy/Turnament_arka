@@ -881,7 +881,7 @@ const state = {
   tournaments: [makeDefaultTournament()],
   activeId: null,
   active: 'dashboard',
-  adminMode: true,
+  adminMode: false,
   sidebarOpen: false,
   showAddTournament: false,
   showImportTeams: false,
@@ -988,10 +988,10 @@ function buildSidebar(t){
   const toggle = h('button', {class:'admin-toggle' + (state.adminMode?' on':''), onclick:function(){
     if (!state.adminMode){
       if (FIREBASE_ENABLED && !fbUser){ state.showAdminLogin = true; render(); return; }
-      state.adminMode = true; render();
+      state.adminMode = true; saveAdminModePref(true); render();
       forceRefreshFromServer().then(function(){ render(); });
     } else {
-      state.adminMode = false; render();
+      state.adminMode = false; saveAdminModePref(false); render();
     }
   }}, [
     h('span', {class:'flex items-center gap-2'}, [icon('sparkles',16), 'Mode Admin']),
@@ -3254,7 +3254,7 @@ function buildAdminLoginModal(){
     submitBtn.textContent = 'Memeriksa…'; submitBtn.disabled = true;
     firebase.auth().signInWithEmailAndPassword(form.email.trim(), form.password)
       .then(function(){
-        state.showAdminLogin = false; state.adminMode = true; render();
+        state.showAdminLogin = false; state.adminMode = true; saveAdminModePref(true); render();
         forceRefreshFromServer().then(function(){ render(); });
       })
       .catch(function(err){
@@ -4428,6 +4428,19 @@ function loadThemeFromLocalStorage(){
     }
   } catch(err){ console.error('Gagal memuat tema dari penyimpanan lokal:', err); }
 }
+// Preferensi ON/OFF Mode Admin per device — dulu ini tidak pernah disimpan, jadi kalau
+// user matiin Mode Admin lalu refresh, sistem balik ke nilai bawaan (nyala lagi sendiri
+// kalau sesi login Firebase-nya masih tersimpan). Sekarang pilihan eksplisit user disimpan
+// dan dihormati, terlepas dari status login-nya.
+const ADMIN_MODE_STORAGE_KEY = 'miniSoccerTournamentAdminModePref_v1';
+function saveAdminModePref(on){
+  try{ localStorage.setItem(ADMIN_MODE_STORAGE_KEY, on ? '1' : '0'); }
+  catch(err){ console.error('Gagal menyimpan preferensi Mode Admin:', err); }
+}
+function loadAdminModePref(){
+  try{ return localStorage.getItem(ADMIN_MODE_STORAGE_KEY) === '1'; }
+  catch(err){ return false; }
+}
 function saveToLocalStorage(){
   try{
     const savedAt = Date.now();
@@ -4533,7 +4546,7 @@ function initFirebase(){
   }
   firebase.auth().onAuthStateChanged(function(user){
     fbUser = user;
-    if (!user) state.adminMode = false;
+    if (!user){ state.adminMode = false; saveAdminModePref(false); }
     safeRender();
   });
   const docRef = fbDb.collection(FB_COLLECTION).doc(FB_DOC);
@@ -4587,6 +4600,7 @@ function showLoadingScreen(){
 }
 const hadLocalData = loadFromLocalStorage();
 loadThemeFromLocalStorage();
+state.adminMode = loadAdminModePref(); // hormati pilihan on/off terakhir user, bukan nilai bawaan
 if (hadLocalData){
   render(); // device ini pernah buka sebelumnya -> tampilkan data lokal ASLI sambil nunggu Firebase
 } else {
