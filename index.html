@@ -2759,12 +2759,27 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams){
   drawSplatterTexture(ctx, W, H, 77);
 
   const logoImg = await loadImgAsync(t.logoImageUrl);
+  const kickImg = await loadImgAsync(t.kickIconUrl);
   ctx.textAlign='center'; ctx.textBaseline='alphabetic';
   let titleY = 90;
   if (logoImg){
     const cleanedLogo = removeDarkBackground(logoImg, 38);
     const lh = 200, lw = lh * (cleanedLogo.width/cleanedLogo.height || 1);
-    ctx.drawImage(cleanedLogo, W/2-lw/2, 30, lw, lh);
+    if (kickImg){
+      // Sandingkan logo turnamen dengan ikon pemain nendang bola (upload sendiri) di
+      // sebelah kirinya, tinggi disamakan dengan logo turnamen.
+      const cleanedKick = recolorSilhouette(kickImg, '#ffffff', 40);
+      const iconH = lh, iconW = iconH * (cleanedKick.width/cleanedKick.height || 1);
+      const comboGap = 22;
+      const comboW = iconW + comboGap + lw;
+      const comboLeft = W/2 - comboW/2;
+      const iconCx = comboLeft + iconW/2;
+      const logoLeft = comboLeft + iconW + comboGap;
+      ctx.drawImage(cleanedLogo, logoLeft, 30, lw, lh);
+      ctx.drawImage(cleanedKick, iconCx-iconW/2, 30+lh/2-iconH/2, iconW, iconH);
+    } else {
+      ctx.drawImage(cleanedLogo, W/2-lw/2, 30, lw, lh);
+    }
     titleY = 268;
   } else {
     ctx.fillStyle = '#f5b400';
