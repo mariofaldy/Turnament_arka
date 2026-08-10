@@ -3128,9 +3128,53 @@ function recalculateBestGK(t){
   t.bestGK = newList;
 }
 
+// Hitung ulang Top Scorers dari catatan pencetak gol di tiap pertandingan yang sudah selesai
+// (s.scorersA/s.scorersB) — ini sumber data asli/ground-truth. Berguna kalau daftar ringkasan
+// "Top Scorers" sempat kehilangan/tidak sinkron dengan catatan per-pertandingan (mis. akibat
+// bug sinkronisasi lama), padahal datanya sendiri masih utuh di halaman Jadwal & Fixtures.
+function recalculateTopScorers(t){
+  const counts = {}; // key: nama|tim -> {name, team, goals}
+  function tally(scorers, teamName){
+    (scorers||[]).forEach(function(sc){
+      const nm = (sc.name||'').trim();
+      if (!nm) return;
+      const key = nm.toLowerCase()+'|'+(teamName||'').trim().toLowerCase();
+      if (!counts[key]) counts[key] = {name:nm, team:teamName||'', goals:0};
+      counts[key].goals += 1;
+    });
+  }
+  t.schedule.forEach(function(s){
+    if (s.status !== 'finished') return;
+    const teamA = t.teams.find(function(x){return x.id===s.teamAId;});
+    const teamB = t.teams.find(function(x){return x.id===s.teamBId;});
+    tally(s.scorersA, teamA ? teamA.name : 'Tim Dihapus');
+    tally(s.scorersB, teamB ? teamB.name : 'Tim Dihapus');
+  });
+  t.topScorers = Object.keys(counts).map(function(k){
+    return {id:nextId(), name:counts[k].name, team:counts[k].team, goals:counts[k].goals};
+  });
+}
+
 function buildPlayerStatsPanel(t){
   const panel = h('div', {class:'panel'});
   const addScorerBtn = state.adminMode ? h('button', {class:'icon-btn', style:{color:'#60a5fa'}, onclick:function(){ T().topScorers.push({id:nextId(),name:'Pemain Baru',team:'Tim',goals:0}); render(); }}, icon('plus',14)) : null;
+  const dedupScorerBtn = state.adminMode ? h('button', {class:'icon-btn', style:{color:'#f87171'}, title:'Gabungkan pemain yang datanya dobel', onclick:function(){
+    const liveT = T();
+    const seen = {}; const merged = [];
+    liveT.topScorers.forEach(function(p){
+      const key = (p.name||'').trim().toLowerCase()+'|'+(p.team||'').trim().toLowerCase();
+      if (seen[key]){ seen[key].goals = (Number(seen[key].goals)||0) + (Number(p.goals)||0); }
+      else { const copy = Object.assign({}, p); seen[key] = copy; merged.push(copy); }
+    });
+    const removed = liveT.topScorers.length - merged.length;
+    if (removed===0){ alert('Tidak ada Top Scorer duplikat ditemukan.'); return; }
+    if (!confirm('Ditemukan ' + removed + ' entri Top Scorer duplikat (nama & tim sama). Gabungkan golnya jadi satu entri?')) return;
+    liveT.topScorers = merged;
+    render();
+  }}, icon('trash',13)) : null;
+  const recalcScorerBtn = state.adminMode ? h('button', {class:'icon-btn', title:'Hitung ulang dari catatan pencetak gol di tiap pertandingan (halaman Jadwal)', onclick:function(){
+    recalculateTopScorers(T()); render();
+  }}, icon('refresh',13)) : null;
   panel.appendChild(sectionTitle('star', 'Statistik Pemain'));
 
   const cols = h('div', {class:'two-col'});
@@ -3139,9 +3183,9 @@ function buildPlayerStatsPanel(t){
   function findLiveGK(id){ return T().bestGK.find(function(x){return x.id===id;}); }
 
   const colA = h('div');
-  colA.appendChild(h('div', {class:'flex items-center justify-between mb-3'}, [h('p',{class:'text-xs muted uppercase'},'Top Scorers'), addScorerBtn]));
+  colA.appendChild(h('div', {class:'flex items-center justify-between mb-3'}, [h('p',{class:'text-xs muted uppercase'},'Top Scorers'), h('div',{class:'flex gap-1'},[recalcScorerBtn, dedupScorerBtn, addScorerBtn])]));
   const listA = h('div', {class:'player-list'});
-  t.topScorers.slice().sort(function(a,b){ return (b.goals||0)-(a.goals||0); }).forEach(function(p){
+  t.topScorers.slice().sort(function(a,b){ return (Number(b.goals)||0)-(Number(a.goals)||0); }).forEach(function(p){
     const pid = p.id;
     const row = h('div', {class:'player-row'}, [
       h('div', {class:'avatar-circle avatar-blue'}, initials(p.name)),
@@ -3161,10 +3205,24 @@ function buildPlayerStatsPanel(t){
   const recalcGkBtn = state.adminMode ? h('button', {class:'icon-btn', title:'Hitung ulang dari hasil pertandingan (pakai posisi kiper terkini)', onclick:function(){
     recalculateBestGK(T()); render();
   }}, icon('refresh',13)) : null;
+  const dedupGkBtn = state.adminMode ? h('button', {class:'icon-btn', style:{color:'#f87171'}, title:'Gabungkan kiper yang datanya dobel', onclick:function(){
+    const liveT = T();
+    const seen = {}; const merged = [];
+    liveT.bestGK.forEach(function(p){
+      const key = (p.name||'').trim().toLowerCase()+'|'+(p.team||'').trim().toLowerCase();
+      if (seen[key]){ seen[key].cleanSheets = (Number(seen[key].cleanSheets)||0) + (Number(p.cleanSheets)||0); }
+      else { const copy = Object.assign({}, p); seen[key] = copy; merged.push(copy); }
+    });
+    const removed = liveT.bestGK.length - merged.length;
+    if (removed===0){ alert('Tidak ada Best Goalkeeper duplikat ditemukan.'); return; }
+    if (!confirm('Ditemukan ' + removed + ' entri kiper duplikat. Gabungkan clean sheet-nya jadi satu entri?')) return;
+    liveT.bestGK = merged;
+    render();
+  }}, icon('trash',13)) : null;
   const colB = h('div');
-  colB.appendChild(h('div', {class:'flex items-center justify-between mb-3'}, [h('p',{class:'text-xs muted uppercase'},'Best Goalkeepers'), h('div',{class:'flex gap-1'},[recalcGkBtn, addGkBtn])]));
+  colB.appendChild(h('div', {class:'flex items-center justify-between mb-3'}, [h('p',{class:'text-xs muted uppercase'},'Best Goalkeepers'), h('div',{class:'flex gap-1'},[recalcGkBtn, dedupGkBtn, addGkBtn])]));
   const listB = h('div', {class:'player-list'});
-  t.bestGK.slice().sort(function(a,b){ return (b.cleanSheets||0)-(a.cleanSheets||0); }).forEach(function(p){
+  t.bestGK.slice().sort(function(a,b){ return (Number(b.cleanSheets)||0)-(Number(a.cleanSheets)||0); }).forEach(function(p){
     const pid = p.id;
     const row = h('div', {class:'player-row'}, [
       h('div', {class:'avatar-circle avatar-purple'}, initials(p.name)),
