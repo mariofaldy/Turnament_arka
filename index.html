@@ -2656,13 +2656,16 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
     drawCrest(ctx, crestImgs[i][0], m.teamA, barX, cy, crestR);
     drawCrest(ctx, crestImgs[i][1], m.teamB, barX+barW, cy, crestR);
 
-    const scoreW = 190, scoreH = barH*0.82;
+    const scoreText = m.scoreA+' - '+m.scoreB;
+    ctx.font='700 58px Rajdhani, sans-serif';
+    const scoreTextW = ctx.measureText(scoreText).width;
+    const scoreW = scoreTextW + 46, scoreH = barH*0.82;
     const scoreX = W/2 - scoreW/2, scoreY = cy - scoreH/2;
     drawRoundedRect(ctx, scoreX, scoreY, scoreW, scoreH, 10);
     ctx.fillStyle = '#ffffff'; ctx.fill();
     ctx.fillStyle = '#12224a'; ctx.font='700 58px Rajdhani, sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(m.scoreA+' - '+m.scoreB, W/2, cy+4);
+    ctx.fillText(scoreText, W/2, cy+4);
 
     ctx.font='700 30px Rajdhani, sans-serif'; ctx.fillStyle='#12224a'; ctx.textBaseline='middle';
     const leftTextX = barX+crestR+28, leftMaxW = scoreX-16-leftTextX;
@@ -2677,7 +2680,7 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
 
   if (hasSponsor){
     const sponsorImg = await loadImgAsync(t.sponsorLogoUrl);
-    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-footerH/2, W-80, footerH-30);
+    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-footerH/2-20, W-80, footerH-30);
   } else {
     ctx.textAlign='center'; ctx.font='600 24px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
     ctx.textBaseline='alphabetic';
@@ -2805,7 +2808,7 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams){
 
   if (hasSponsor){
     const sponsorImg = await loadImgAsync(t.sponsorLogoUrl);
-    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-footerH/2, W-80, footerH-30);
+    if (sponsorImg) drawSponsorStrip(ctx, sponsorImg, W, H-footerH/2-20, W-80, footerH-30);
   } else {
     ctx.textAlign='center'; ctx.font='600 24px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.65)';
     ctx.textBaseline='alphabetic';
