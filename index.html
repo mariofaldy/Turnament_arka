@@ -3460,6 +3460,7 @@ function buildAdminSettingsPage(t){
     denied.appendChild(h('p', {class:'text-sm muted'}, 'Halaman ini khusus untuk admin. Nyalakan Mode Admin di sidebar untuk mengaksesnya.'));
     return denied;
   }
+  console.log('[Admin Settings] halaman dibangun ulang. t.id:', t.id, '| t.logoImageUrl ada?', !!t.logoImageUrl, '| panjang data:', t.logoImageUrl ? t.logoImageUrl.length : 0);
   const wrap = h('div', {class:'flex-col gap-6'});
 
   const panel1 = h('div', {class:'panel'});
@@ -3478,9 +3479,14 @@ function buildAdminSettingsPage(t){
   const logoUploadWrap = h('div', {style:{marginBottom:'18px'}});
   logoUploadWrap.appendChild(h('label', {class:'form-label'}, 'Logo Turnamen (buat poster Match Result)'));
   const logoPreviewRow = h('div', {class:'flex items-center gap-3'});
+  console.log('[Admin Settings] membangun logoPreview. t.logoImageUrl truthy?', !!t.logoImageUrl);
   const logoPreview = t.logoImageUrl
     ? h('img', {src:t.logoImageUrl, style:{height:'64px', width:'64px', objectFit:'contain', borderRadius:'10px', background:'rgba(0,0,0,.15)'}})
     : h('div', {class:'text-xs muted', style:{height:'64px', width:'64px', display:'flex', alignItems:'center', justifyContent:'center', border:'1px dashed var(--border)', borderRadius:'10px'}}, 'Belum ada');
+  if (t.logoImageUrl){
+    logoPreview.addEventListener('load', function(){ console.log('[Admin Settings] preview <img> BERHASIL dirender oleh browser.'); });
+    logoPreview.addEventListener('error', function(err){ console.error('[Admin Settings] preview <img> GAGAL dirender oleh browser (data URI mungkin rusak):', err); });
+  }
   logoPreviewRow.appendChild(logoPreview);
   const logoUploadBtn = h('button', {class:'btn btn-ghost-blue', type:'button', onclick:function(e){
     e.preventDefault(); e.stopPropagation();
