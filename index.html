@@ -3733,7 +3733,7 @@ function buildFixturesPage(t){
   panel2.appendChild(sectionTitle('calendar', 'Semua Jadwal Pertandingan', cleanupBtn));
   const teamName = function(id){ const f=t.teams.find(function(x){return x.id===id;}); return f?f.name:'Tim Dihapus'; };
 
-  t.schedule.forEach(function(s){
+  t.schedule.slice().sort(function(a,b){ return fixtureSortKey(a)-fixtureSortKey(b); }).forEach(function(s){
     const infoBlock = h('div', {style:{flex:1, minWidth:0}});
     const nameRow = h('div', {class:'flex items-center gap-2 text-sm'});
     nameRow.appendChild(h('span', {class:'font-semibold truncate'}, teamName(s.teamAId)));
