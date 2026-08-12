@@ -988,10 +988,18 @@ function buildSidebar(t){
   const toggle = h('button', {class:'admin-toggle' + (state.adminMode?' on':''), onclick:function(){
     if (!state.adminMode){
       if (FIREBASE_ENABLED && !fbUser){ state.showAdminLogin = true; render(); return; }
-      state.adminMode = true; saveAdminModePref(true); render();
-      forceRefreshFromServer().then(function(){ render(); });
+      tryClaimAdminLock().then(function(result){
+        if (!result.ok){
+          alert('Mode Admin sedang aktif di ' + result.holder + '. Matikan Mode Admin di device itu dulu, atau tunggu sebentar (otomatis lepas kalau device itu tidak aktif).');
+          return;
+        }
+        state.adminMode = true; saveAdminModePref(true); render();
+        startAdminHeartbeat();
+        forceRefreshFromServer().then(function(){ render(); });
+      });
     } else {
       state.adminMode = false; saveAdminModePref(false); render();
+      stopAdminHeartbeat(); releaseAdminLock();
     }
   }}, [
     h('span', {class:'flex items-center gap-2'}, [icon('sparkles',16), 'Mode Admin']),
@@ -1400,6 +1408,50 @@ function pickImageFile(onPicked){
   };
   sharedFileInput.click();
 }
+// Kompres ulang SATU gambar (data URI) yang sudah tersimpan, pakai pengaturan terbaru —
+// dipakai buat "Kompres Ulang Semua Gambar" supaya gambar lama (dari kompresi versi lama
+// yang lebih boros) ikut mengecil tanpa perlu upload manual satu-satu lagi.
+function reprocessStoredImage(dataUrl, maxPx, quality){
+  return new Promise(function(resolve){
+    if (!dataUrl){ resolve(null); return; }
+    const img = new Image();
+    img.onload = function(){
+      let w = img.naturalWidth||img.width, h = img.naturalHeight||img.height;
+      if (!w || !h){ resolve(dataUrl); return; }
+      const scale = Math.min(1, maxPx/Math.max(w,h));
+      w = Math.max(1, Math.round(w*scale)); h = Math.max(1, Math.round(h*scale));
+      const canvas = document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,w,h);
+      ctx.drawImage(img,0,0,w,h);
+      try{ resolve(canvas.toDataURL('image/jpeg', quality)); }
+      catch(err){ console.error('Gagal mengompres ulang gambar:', err); resolve(dataUrl); }
+    };
+    img.onerror = function(){ resolve(dataUrl); };
+    img.src = dataUrl;
+  });
+}
+// Jalankan ulang kompresi ke SEMUA gambar yang tersimpan di satu turnamen (logo tim, logo
+// turnamen, ikon pemain, strip sponsor, foto latar default & per-grup) — berguna kalau
+// datanya sudah menumpuk dari upload-upload lama yang belum sekecil pengaturan sekarang.
+async function recompressAllImages(t){
+  const teamJobs = t.teams.map(async function(team){
+    if (team.logoUrl) team.logoUrl = await reprocessStoredImage(team.logoUrl, LOGO_MAX_PX, LOGO_QUALITY);
+  });
+  await Promise.all(teamJobs);
+  if (t.logoImageUrl) t.logoImageUrl = await reprocessStoredImage(t.logoImageUrl, LOGO_MAX_PX, LOGO_QUALITY);
+  if (t.kickIconUrl) t.kickIconUrl = await reprocessStoredImage(t.kickIconUrl, LOGO_MAX_PX, LOGO_QUALITY);
+  if (t.sponsorLogoUrl) t.sponsorLogoUrl = await reprocessStoredImage(t.sponsorLogoUrl, BANNER_MAX_PX, BANNER_QUALITY);
+  if (t.heroImageUrl) t.heroImageUrl = await reprocessStoredImage(t.heroImageUrl, HERO_MAX_PX, HERO_QUALITY);
+  if (t.groupHeroImages){
+    const gids = Object.keys(t.groupHeroImages);
+    const heroJobs = gids.map(async function(gid){
+      t.groupHeroImages[gid] = await reprocessStoredImage(t.groupHeroImages[gid], HERO_MAX_PX, HERO_QUALITY);
+    });
+    await Promise.all(heroJobs);
+  }
+}
 
 function teamLogoEl(team, size){
   size = size||44;
@@ -1577,13 +1629,20 @@ function ensureLiveTimer(){
     if (m>=totalMin) return;
     t.liveMatch.minute = m; t.liveMatch.second = s;
     if (shouldSkipAutoRender()) return;
-    // Jam berjalan tiap detik cuma diperbarui LOKAL di layar ini — kalau tiap detik juga
-    // dikirim penuh ke Firebase, koneksi (apalagi di HP/data seluler) kebanjiran kiriman
-    // dan bikin device lain lambat nerima update. Kirim ke cloud cukup tiap 5 detik saja;
-    // perubahan penting (gol, kartu, skor, jeda, selesai) tetap langsung terkirim seperti biasa
-    // karena itu semua manggil render() biasa, bukan lewat sini.
+    // Jam berjalan tiap detik cuma diperbarui LOKAL di layar ini (biar semua orang yang
+    // lihat tetap lihat jamnya jalan halus) — kalau tiap detik juga dikirim penuh ke
+    // Firebase, koneksi (apalagi di HP/data seluler) kebanjiran kiriman dan bikin device
+    // lain lambat nerima update. Kirim ke cloud cukup tiap 5 detik saja.
     renderLocal();
-    if (s % 5 === 0) scheduleSave();
+    // PENTING: dulu baris di bawah ini jalan di SEMUA device yang kebetulan masih punya
+    // sesi login Firebase tersimpan, TANPA mengecek apakah Mode Admin di device itu
+    // benar-benar sedang dinyalakan oleh usernya. Akibatnya, device yang cuma dipakai buat
+    // "lihat-lihat" (Mode Admin sudah dimatikan manual, tapi sesi login masih ada) bisa
+    // diam-diam tetap menulis ke server tiap 5 detik pakai data yang boleh jadi sudah
+    // ketinggalan di device itu — menimpa perubahan yang baru dibuat di device lain.
+    // Sekarang PENGIRIMANNYA (bukan tampilan jamnya) hanya jalan kalau Mode Admin memang
+    // sedang aktif di device ini.
+    if (s % 5 === 0 && state.adminMode) scheduleSave();
   }, 1000);
 }
 
@@ -3254,8 +3313,17 @@ function buildAdminLoginModal(){
     submitBtn.textContent = 'Memeriksa…'; submitBtn.disabled = true;
     firebase.auth().signInWithEmailAndPassword(form.email.trim(), form.password)
       .then(function(){
-        state.showAdminLogin = false; state.adminMode = true; saveAdminModePref(true); render();
-        forceRefreshFromServer().then(function(){ render(); });
+        return tryClaimAdminLock().then(function(result){
+          if (!result.ok){
+            errEl.textContent = 'Mode Admin sedang aktif di ' + result.holder + '. Matikan Mode Admin di device itu dulu, atau tunggu sebentar.';
+            errEl.style.display = 'block';
+            submitBtn.textContent = 'Masuk'; submitBtn.disabled = false;
+            return;
+          }
+          state.showAdminLogin = false; state.adminMode = true; saveAdminModePref(true); render();
+          startAdminHeartbeat();
+          forceRefreshFromServer().then(function(){ render(); });
+        });
       })
       .catch(function(err){
         submitBtn.disabled = false; submitBtn.innerHTML = ''; submitBtn.appendChild(icon('sparkles',16)); submitBtn.appendChild(document.createTextNode(' Masuk'));
@@ -3937,6 +4005,16 @@ function buildAdminSettingsPage(t){
   panel1.appendChild(h('p', {class:'text-xs', style:{marginTop:'6px', color: sizeWarn ? 'var(--red)' : 'var(--text-4)'}},
     'Ukuran data turnamen ini: ~' + approxKB + ' KB' + (sizeWarn ? ' — sudah mendekati batas 1000 KB. Hapus beberapa logo tim yang tidak perlu supaya perubahan baru (termasuk logo turnamen) tetap bisa tersimpan.' : '.')
   ));
+  const recompressBtn = h('button', {class:'btn btn-ghost-purple', style:{marginTop:'10px', fontSize:'12px'}, onclick:function(){
+    if (!confirm('Kompres ulang SEMUA gambar (logo tim, logo turnamen, ikon pemain, sponsor, foto latar) pakai pengaturan terbaru yang lebih hemat? Proses ini bisa makan waktu beberapa detik, dan sedikit menurunkan kualitas gambar (biasanya tidak kelihatan bedanya).')) return;
+    recompressBtn.disabled = true; recompressBtn.textContent = 'Memproses…';
+    const liveT = T();
+    recompressAllImages(liveT).then(function(){
+      render();
+      alert('Selesai! Data turnamen sudah dikompres ulang — cek ukurannya di sini, dan aplikasi seharusnya terasa lebih responsif.');
+    });
+  }}, [icon('refresh',13), 'Kompres Ulang Semua Gambar (biar Lebih Cepat)']);
+  panel1.appendChild(recompressBtn);
 
   wrap.appendChild(panel1);
 
@@ -4353,6 +4431,18 @@ const FIREBASE_CONFIG = {
 };
 const FB_COLLECTION = 'miniSoccerTournament';
 const FB_DOC = 'sharedState';
+const FB_LOCK_DOC = 'adminLock'; // dokumen TERPISAH, khusus buat "kunci" siapa yang lagi pegang Mode Admin
+const ADMIN_LOCK_STALE_MS = 25000; // kalau pemegang kunci ga heartbeat 25 detik, dianggap sudah tidak aktif
+const ADMIN_HEARTBEAT_MS = 12000;
+const DEVICE_ID_KEY = 'miniSoccerTournamentDeviceId_v1';
+function getDeviceId(){
+  try{
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id){ id = 'dev_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem(DEVICE_ID_KEY, id); }
+    return id;
+  } catch(err){ return 'dev_' + Math.random().toString(36).slice(2); }
+}
+const MY_DEVICE_ID = getDeviceId();
 const FIREBASE_ENABLED = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf('GANTI') === -1);
 
 let fbDb = null, fbReady = false, fbApplyingRemote = false, fbSaveTimer = null;
@@ -4367,6 +4457,60 @@ function forceRefreshFromServer(){
     if (snap.exists) safeApplySnapshot(snap.data());
   }).catch(function(err){ console.error('Gagal menyegarkan data sebelum mode admin aktif:', err); });
 }
+
+/* ---------- KUNCI MODE ADMIN: cuma satu device yang boleh pegang Mode Admin sekaligus ----------
+   Disimpan di dokumen TERPISAH (bukan campur sama data turnamen) supaya tidak ikut ketimpa
+   /menimpa proses simpan-data biasa. Device yang pegang kunci wajib "heartbeat" berkala
+   selagi Mode Admin aktif; kalau berhenti heartbeat (device ditutup/koneksi putus) lebih
+   dari ADMIN_LOCK_STALE_MS, kuncinya dianggap lepas sendiri dan device lain boleh mengambil alih. */
+let adminHeartbeatTimer = null;
+function tryClaimAdminLock(){
+  if (!FIREBASE_ENABLED || !fbDb){ return Promise.resolve({ok:true}); } // Firebase mati -> mode lokal, tidak ada kunci
+  const lockRef = fbDb.collection(FB_COLLECTION).doc(FB_LOCK_DOC);
+  return lockRef.get().then(function(snap){
+    const lock = snap.exists ? snap.data() : null;
+    const now = Date.now();
+    const heldByOther = lock && lock.deviceId && lock.deviceId !== MY_DEVICE_ID && lock.updatedAt && (now - lock.updatedAt) < ADMIN_LOCK_STALE_MS;
+    if (heldByOther){
+      return {ok:false, holder: lock.deviceLabel || 'device lain'};
+    }
+    return lockRef.set({deviceId:MY_DEVICE_ID, deviceLabel: guessDeviceLabel(), updatedAt: now}).then(function(){
+      return {ok:true};
+    });
+  }).catch(function(err){
+    console.error('Gagal cek/klaim kunci Mode Admin:', err);
+    return {ok:true}; // kalau geal cek (mis. jaringan lagi bermasalah), jangan blokir total — lebih baik biarkan lanjut
+  });
+}
+function startAdminHeartbeat(){
+  if (adminHeartbeatTimer || !FIREBASE_ENABLED || !fbDb) return;
+  adminHeartbeatTimer = setInterval(function(){
+    if (!state.adminMode) return;
+    fbDb.collection(FB_COLLECTION).doc(FB_LOCK_DOC).set({deviceId:MY_DEVICE_ID, deviceLabel: guessDeviceLabel(), updatedAt: Date.now()}).catch(function(err){ console.error('Gagal heartbeat kunci Mode Admin:', err); });
+  }, ADMIN_HEARTBEAT_MS);
+}
+function stopAdminHeartbeat(){
+  if (adminHeartbeatTimer){ clearInterval(adminHeartbeatTimer); adminHeartbeatTimer = null; }
+}
+function releaseAdminLock(){
+  if (!FIREBASE_ENABLED || !fbDb) return;
+  fbDb.collection(FB_COLLECTION).doc(FB_LOCK_DOC).get().then(function(snap){
+    // Cuma hapus kalau kuncinya emang masih punya device ini — jangan sampai tidak sengaja
+    // melepas kunci milik device lain yang baru saja mengambil alih.
+    if (snap.exists && snap.data().deviceId === MY_DEVICE_ID){
+      fbDb.collection(FB_COLLECTION).doc(FB_LOCK_DOC).delete().catch(function(){});
+    }
+  }).catch(function(){});
+}
+function guessDeviceLabel(){
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad/.test(ua)) return 'iPhone/iPad';
+  if (/Android/.test(ua)) return 'HP Android';
+  if (/Mac/.test(ua)) return 'Mac';
+  if (/Windows/.test(ua)) return 'Windows PC';
+  return 'device lain';
+}
+
 let fbStatus = FIREBASE_ENABLED ? 'connecting' : 'disabled';
 let fbUser = null;
 
@@ -4477,9 +4621,16 @@ let fbWriteQueued = false;   // ada perubahan baru yang masuk SELAGI tulisan seb
 function scheduleSave(){
   // Selalu simpan ke localStorage browser ini, apa pun status Firebase-nya.
   saveToLocalStorage();
-  // Hanya admin yang login yang boleh menulis ke Firestore — pengunjung biasa
-  // cuma baca (real-time listener), sesuai Firestore Rules di komentar atas.
-  if (!FIREBASE_ENABLED || !fbReady || fbApplyingRemote || !fbUser) return;
+  // Hanya device yang Mode Admin-nya BENAR-BENAR sedang aktif yang boleh menulis ke
+  // Firestore — sebelumnya cuma dicek fbUser (sesi login Firebase), padahal sesi login
+  // bisa saja masih "nempel" di suatu device walau user sudah mematikan Mode Admin secara
+  // manual di situ (misal HP yang cuma dipakai buat lihat-lihat). Kalau device seperti itu
+  // memanggil render() untuk alasan apa pun (bahkan cuma pindah halaman), datanya yang
+  // boleh jadi sudah ketinggalan bisa diam-diam tertulis ulang ke server dan menimpa
+  // perubahan yang baru dibuat di device lain. Sekarang device pengunjung biasa (Mode
+  // Admin off) tidak akan pernah menulis ke server sama sekali, terlepas dari status
+  // login Firebase-nya.
+  if (!FIREBASE_ENABLED || !fbReady || fbApplyingRemote || !fbUser || !state.adminMode) return;
   setFbStatus('saving');
   fbWritePending = true; // sejak sekarang sampai tulisan ini sukses, abaikan snapshot masuk yang lebih lama
   clearTimeout(fbSaveTimer);
@@ -4493,19 +4644,41 @@ function scheduleSave(){
 let fbBackoffMs = 0; // jeda tambahan sebelum coba lagi setelah gagal — naik tiap gagal berturut-turut
 function performFirestoreWrite(){
   if (fbWriteInFlight){ fbWriteQueued = true; return; }
+  fbWriteInFlight = true;
+  const docRef = fbDb.collection(FB_COLLECTION).doc(FB_DOC);
+  // Cek dulu data TERBARU di server tepat sebelum menulis — supaya kalau ada perubahan dari
+  // tab/device lain yang belum sempat kita terima lewat siklus poll biasa (jeda sampai 2.5
+  // detik), kita serap dulu perubahan itu SEBELUM menimpanya dengan data kita. Ini menutup
+  // celah waktu terakhir yang selama ini masih bisa bikin perubahan hilang "ketiban" tulisan
+  // sendiri — bahkan ketika cuma satu device yang benar-benar aktif mengedit.
+  docRef.get().then(function(snap){
+    if (snap.exists){
+      const serverData = snap.data();
+      if (serverData.savedAt && localDataSavedAt && serverData.savedAt > localDataSavedAt){
+        fbApplyingRemote = true; fbApplySnapshot(serverData); fbApplyingRemote = false;
+        localDataSavedAt = serverData.savedAt;
+        safeRender(); // sinkronkan tampilan juga, jangan sampai beda dari apa yang barusan diserap
+      }
+    }
+    doActualFirestoreWrite(docRef);
+  }).catch(function(err){
+    console.error('Gagal cek data terbaru sebelum menulis, lanjut tulis seperti biasa:', err);
+    doActualFirestoreWrite(docRef);
+  });
+}
+function doActualFirestoreWrite(docRef){
   const payload = fbSnapshotData();
   // Firestore membatasi 1 MB per dokumen. Kalau kelewat (biasanya karena logo
   // terlalu besar), tulisannya akan ditolak — beri tahu, jangan gagal diam-diam.
   const approxBytes = new Blob([JSON.stringify(payload)]).size;
   if (approxBytes > 900000){
     setFbStatus('error');
-    fbWritePending = false;
+    fbWritePending = false; fbWriteInFlight = false;
     console.error('Data terlalu besar untuk Firestore:', approxBytes, 'byte (batas 1 MB).');
     alert('Data turnamen sudah terlalu besar (' + Math.round(approxBytes/1024) + ' KB, batas 1 MB) sehingga gagal disimpan ke cloud.\n\nBiasanya ini karena terlalu banyak logo tim. Coba hapus beberapa logo yang tidak terpakai. Data tetap tersimpan di browser ini.');
     return;
   }
-  fbWriteInFlight = true;
-  fbDb.collection(FB_COLLECTION).doc(FB_DOC).set(payload)
+  docRef.set(payload)
     .then(function(){
       setFbStatus('synced'); fbWritePending = false; fbWriteInFlight = false;
       fbBackoffMs = 0; // sukses -> reset, tulisan berikutnya boleh langsung coba lagi
@@ -4546,7 +4719,22 @@ function initFirebase(){
   }
   firebase.auth().onAuthStateChanged(function(user){
     fbUser = user;
-    if (!user){ state.adminMode = false; saveAdminModePref(false); }
+    if (!user){ state.adminMode = false; saveAdminModePref(false); stopAdminHeartbeat(); releaseAdminLock(); }
+    else if (state.adminMode){
+      // Halaman baru dimuat/refresh dan preferensi terakhir user adalah Mode Admin nyala —
+      // klaim ulang kuncinya (mulai heartbeat lagi), atau matikan kalau ternyata device lain
+      // sudah mengambil alih selagi device ini refresh.
+      tryClaimAdminLock().then(function(result){
+        if (!result.ok){
+          state.adminMode = false; saveAdminModePref(false);
+          alert('Mode Admin sekarang aktif di ' + result.holder + ', jadi device ini otomatis dipindah ke mode lihat-lihat.');
+        } else {
+          startAdminHeartbeat();
+        }
+        safeRender();
+      });
+      return;
+    }
     safeRender();
   });
   const docRef = fbDb.collection(FB_COLLECTION).doc(FB_DOC);
@@ -4580,7 +4768,7 @@ function initFirebase(){
       }).catch(function(err){
         console.error('Gagal polling data terbaru dari Firebase:', err);
       });
-    }, 4000);
+    }, 2500);
   }).catch(function(err){
     console.error('Firebase get error:', err);
     setFbStatus('error'); fbReady = true; render(); ensureLiveTimer();
@@ -4619,6 +4807,10 @@ window.addEventListener('beforeunload', function(e){
     e.preventDefault();
     e.returnValue = '';
   }
+  // Percobaan terbaik buat lepas kunci Mode Admin pas tab ditutup — tidak selalu berhasil
+  // (browser bisa memutus request async saat halaman menutup), makanya sistem heartbeat +
+  // batas waktu basi tetap jadi jaring pengaman utama.
+  if (state.adminMode) releaseAdminLock();
 });
 </script>
 </body>
