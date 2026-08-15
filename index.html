@@ -882,6 +882,7 @@ const state = {
   activeId: null,
   active: 'dashboard',
   adminMode: false,
+  checkingAdminLock: false,
   sidebarOpen: false,
   showAddTournament: false,
   showImportTeams: false,
@@ -985,12 +986,15 @@ function buildSidebar(t){
   sb.appendChild(nav);
 
   const bottom = h('div', {class:'sb-bottom'});
-  const toggle = h('button', {class:'admin-toggle' + (state.adminMode?' on':''), onclick:function(){
+  const toggle = h('button', {class:'admin-toggle' + (state.adminMode?' on':''), disabled: state.checkingAdminLock, onclick:function(){
     if (!state.adminMode){
       if (FIREBASE_ENABLED && !fbUser){ state.showAdminLogin = true; render(); return; }
+      state.checkingAdminLock = true; render(); // kasih tanda visual "lagi diproses" biar tombolnya ga kelihatan mati
       tryClaimAdminLock().then(function(result){
+        state.checkingAdminLock = false;
         if (!result.ok){
           alert('Mode Admin sedang aktif di ' + result.holder + '. Matikan Mode Admin di device itu dulu, atau tunggu sebentar (otomatis lepas kalau device itu tidak aktif).');
+          render();
           return;
         }
         state.adminMode = true; saveAdminModePref(true); render();
@@ -1002,7 +1006,7 @@ function buildSidebar(t){
       stopAdminHeartbeat(); releaseAdminLock();
     }
   }}, [
-    h('span', {class:'flex items-center gap-2'}, [icon('sparkles',16), 'Mode Admin']),
+    h('span', {class:'flex items-center gap-2'}, [icon('sparkles',16), state.checkingAdminLock ? 'Memeriksa…' : 'Mode Admin']),
     h('span', {class:'switch' + (state.adminMode?' on':'')}, [h('span',{class:'dot'})])
   ]);
   bottom.appendChild(toggle);
@@ -2698,7 +2702,7 @@ function recolorSilhouette(img, hexColor, threshold){
   cx.putImageData(data, 0, 0);
   return c;
 }
-async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
+async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches, isBracket){
   const W = 1080;
   const rowH = 128, rowGap = 24;
   const headerH = 480;
@@ -2762,16 +2766,26 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
   const subtitleY = titleBaseY + 65;
 
   ctx.textAlign='left'; ctx.font = '700 32px Rajdhani, sans-serif';
-  // Ambil cuma huruf/kode grupnya aja (mis. "A" dari "Grup A"), bukan nama lengkapnya —
-  // supaya ga dobel sama tulisan "GROUP" yang sudah ada di depannya.
-  const groupLetter = (groupLabel||'').trim().split(/\s+/).pop() || groupLabel;
-  const gA = 'GROUP ', gB = groupLetter.toUpperCase()+'  ', gC = '|  ', gD = dateLabel.toUpperCase();
-  const wgA=ctx.measureText(gA).width, wgB=ctx.measureText(gB).width, wgC=ctx.measureText(gC).width, wgD=ctx.measureText(gD).width;
-  sx = W/2 - (wgA+wgB+wgC+wgD)/2;
-  ctx.fillStyle='#ffffff'; ctx.fillText(gA, sx, subtitleY); sx+=wgA;
-  ctx.fillStyle='#f97316'; ctx.fillText(gB, sx, subtitleY); sx+=wgB;
-  ctx.fillStyle='#ffffff'; ctx.fillText(gC, sx, subtitleY); sx+=wgC;
-  ctx.fillStyle='#f5c518'; ctx.fillText(gD, sx, subtitleY);
+  if (isBracket){
+    // Semifinal & Final: tampilkan labelnya langsung (bukan format "GROUP X").
+    const bA = (groupLabel||'').toUpperCase()+'  ', bB = '|  ', bC = dateLabel.toUpperCase();
+    const wbA=ctx.measureText(bA).width, wbB=ctx.measureText(bB).width, wbC=ctx.measureText(bC).width;
+    sx = W/2 - (wbA+wbB+wbC)/2;
+    ctx.fillStyle='#f97316'; ctx.fillText(bA, sx, subtitleY); sx+=wbA;
+    ctx.fillStyle='#ffffff'; ctx.fillText(bB, sx, subtitleY); sx+=wbB;
+    ctx.fillStyle='#f5c518'; ctx.fillText(bC, sx, subtitleY);
+  } else {
+    // Ambil cuma huruf/kode grupnya aja (mis. "A" dari "Grup A"), bukan nama lengkapnya —
+    // supaya ga dobel sama tulisan "GROUP" yang sudah ada di depannya.
+    const groupLetter = (groupLabel||'').trim().split(/\s+/).pop() || groupLabel;
+    const gA = 'GROUP ', gB = groupLetter.toUpperCase()+'  ', gC = '|  ', gD = dateLabel.toUpperCase();
+    const wgA=ctx.measureText(gA).width, wgB=ctx.measureText(gB).width, wgC=ctx.measureText(gC).width, wgD=ctx.measureText(gD).width;
+    sx = W/2 - (wgA+wgB+wgC+wgD)/2;
+    ctx.fillStyle='#ffffff'; ctx.fillText(gA, sx, subtitleY); sx+=wgA;
+    ctx.fillStyle='#f97316'; ctx.fillText(gB, sx, subtitleY); sx+=wgB;
+    ctx.fillStyle='#ffffff'; ctx.fillText(gC, sx, subtitleY); sx+=wgC;
+    ctx.fillStyle='#f5c518'; ctx.fillText(gD, sx, subtitleY);
+  }
 
   // load semua crest dulu (data URL -> aman ditarik ke canvas tanpa masalah CORS)
   const crestImgs = await Promise.all(matches.map(function(m){
@@ -2810,6 +2824,11 @@ async function drawMatchResultPoster(t, canvas, groupLabel, dateLabel, matches){
     const rightTextX = barX+barW-crestR-28, rightMaxW = rightTextX-(scoreX+scoreW+16);
     ctx.textAlign='right';
     ctx.fillText(truncateText(ctx, (m.teamB?m.teamB.name:'Tim Dihapus').toUpperCase(), rightMaxW), rightTextX, cy);
+
+    if (m.note){
+      ctx.font='600 18px Rajdhani, sans-serif'; ctx.fillStyle='#12224a'; ctx.textAlign='center'; ctx.textBaseline='top';
+      ctx.fillText(m.note, W/2, scoreY+scoreH+4);
+    }
 
     y += rowH+rowGap;
   });
@@ -3124,7 +3143,8 @@ function buildKlasemenPosterModal(t){
 function buildMatchResultModal(t){
   const cfg = state.showMatchResult;
   const groupList = t.groups.length ? t.groups : [{id:null, name:'Semua Tim'}];
-  if (!groupList.find(function(g){return g.id===cfg.groupId;})) cfg.groupId = groupList[0].id;
+  const BRACKET_OPT = '__bracket__';
+  if (cfg.groupId !== BRACKET_OPT && !groupList.find(function(g){return g.id===cfg.groupId;})) cfg.groupId = groupList[0].id;
 
   function groupIdOfTeam(teamId){ const tm=t.teams.find(function(x){return x.id===teamId;}); return tm ? tm.groupId : undefined; }
   function matchesForGroup(gid){
@@ -3140,6 +3160,29 @@ function buildMatchResultModal(t){
     });
     return dedup;
   }
+  // Hasil Semifinal & Final — ini tersimpan di t.bracket (bukan t.schedule), karena kedua
+  // timnya berasal dari grup yang beda-beda. match.note otomatis kebawa kalau menang lewat
+  // adu penalti (mis. "Menang Adu Penalti 4-3"), ditampilkan di bawah skor di poster.
+  function matchesForBracket(){
+    if (!t.bracket || !t.bracket.rounds) return [];
+    const out = [];
+    t.bracket.rounds.forEach(function(round){
+      round.matches.forEach(function(m){
+        if (!m.winner) return;
+        const teamA = t.teams.find(function(x){return x.name===m.a;});
+        const teamB = t.teams.find(function(x){return x.name===m.b;});
+        // cari tanggal dari jadwal yang cocok (kalau match ini juga sempat didaftarkan di Jadwal)
+        const sched = t.schedule.find(function(s){
+          return (teamA && teamB) && ((s.teamAId===teamA.id && s.teamBId===teamB.id) || (s.teamAId===teamB.id && s.teamBId===teamA.id));
+        });
+        out.push({
+          teamA: teamA, teamB: teamB, scoreA: m.scoreA||0, scoreB: m.scoreB||0,
+          date: sched ? sched.date : '', note: m.note || null
+        });
+      });
+    });
+    return out;
+  }
 
   const overlay = h('div', {class:'modal-overlay', onclick:function(e){ if(e.target===overlay){ state.showMatchResult=null; render(); } }});
   const box = h('div', {class:'modal-box', style:{maxWidth:'560px'}});
@@ -3148,7 +3191,11 @@ function buildMatchResultModal(t){
   const body = h('div', {class:'flex-col gap-4'});
   const groupWrap = h('div', {});
   groupWrap.appendChild(h('label',{class:'form-label'},'Grup'));
-  const groupSel = h('select', {class:'form-input'}, groupList.map(function(g){ return h('option',{value:g.id}, g.name); }));
+  const groupOptions = groupList.map(function(g){ return h('option',{value:g.id}, g.name); });
+  if (t.bracket && t.bracket.rounds && t.bracket.rounds.length){
+    groupOptions.push(h('option', {value:BRACKET_OPT}, 'Semifinal & Final'));
+  }
+  const groupSel = h('select', {class:'form-input'}, groupOptions);
   groupSel.value = cfg.groupId;
   groupSel.addEventListener('change', function(e){ cfg.groupId = e.target.value === 'null' ? null : e.target.value; genPreview(); });
   groupWrap.appendChild(groupSel);
@@ -3166,24 +3213,32 @@ function buildMatchResultModal(t){
   let currentCanvas = null;
   let currentDateLabel = '';
   function genPreview(){
-    const sched = matchesForGroup(cfg.groupId);
-    const matches = sched.map(function(s){
-      return {
-        teamA: t.teams.find(function(x){return x.id===s.teamAId;}),
-        teamB: t.teams.find(function(x){return x.id===s.teamBId;}),
-        scoreA: s.scoreA, scoreB: s.scoreB, date: s.date
-      };
-    });
+    const isBracket = cfg.groupId === BRACKET_OPT;
+    let matches, groupName;
+    if (isBracket){
+      matches = matchesForBracket();
+      groupName = 'SEMIFINAL & FINAL';
+      currentDateLabel = matches.length ? (matches[matches.length-1].date || '') : '';
+    } else {
+      const sched = matchesForGroup(cfg.groupId);
+      matches = sched.map(function(s){
+        return {
+          teamA: t.teams.find(function(x){return x.id===s.teamAId;}),
+          teamB: t.teams.find(function(x){return x.id===s.teamBId;}),
+          scoreA: s.scoreA, scoreB: s.scoreB, date: s.date, note: null
+        };
+      });
+      groupName = (t.groups.find(function(g){return g.id===cfg.groupId;})||{}).name || 'SEMUA TIM';
+      currentDateLabel = sched.length ? sched[0].date : ''; // tanggal pertandingan pertama grup ini
+    }
     if (matches.length===0){
-      previewWrap.innerHTML=''; statusMsg.textContent = 'Belum ada hasil pertandingan yang selesai di grup ini.';
+      previewWrap.innerHTML=''; statusMsg.textContent = isBracket ? 'Belum ada hasil Semifinal/Final yang selesai.' : 'Belum ada hasil pertandingan yang selesai di grup ini.';
       downloadBtn.disabled = true;
       return;
     }
-    currentDateLabel = sched[0].date; // tanggal pertandingan pertama grup ini
     statusMsg.textContent = 'Memuat pratinjau…';
-    const groupName = (t.groups.find(function(g){return g.id===cfg.groupId;})||{}).name || 'SEMUA TIM';
     const canvas = document.createElement('canvas');
-    drawMatchResultPoster(t, canvas, groupName, currentDateLabel, matches).then(function(){
+    drawMatchResultPoster(t, canvas, groupName, currentDateLabel, matches, isBracket).then(function(){
       currentCanvas = canvas;
       previewWrap.innerHTML = '';
       const img = h('img', {src:canvas.toDataURL('image/png'), style:{maxWidth:'100%', borderRadius:'8px', display:'block', margin:'0 auto'}});
@@ -4467,7 +4522,7 @@ let adminHeartbeatTimer = null;
 function tryClaimAdminLock(){
   if (!FIREBASE_ENABLED || !fbDb){ return Promise.resolve({ok:true}); } // Firebase mati -> mode lokal, tidak ada kunci
   const lockRef = fbDb.collection(FB_COLLECTION).doc(FB_LOCK_DOC);
-  return lockRef.get().then(function(snap){
+  const attempt = lockRef.get().then(function(snap){
     const lock = snap.exists ? snap.data() : null;
     const now = Date.now();
     const heldByOther = lock && lock.deviceId && lock.deviceId !== MY_DEVICE_ID && lock.updatedAt && (now - lock.updatedAt) < ADMIN_LOCK_STALE_MS;
@@ -4479,8 +4534,14 @@ function tryClaimAdminLock(){
     });
   }).catch(function(err){
     console.error('Gagal cek/klaim kunci Mode Admin:', err);
-    return {ok:true}; // kalau geal cek (mis. jaringan lagi bermasalah), jangan blokir total — lebih baik biarkan lanjut
+    return {ok:true}; // kalau gagal cek (mis. jaringan lagi bermasalah), jangan blokir total — lebih baik biarkan lanjut
   });
+  // Jaring pengaman: kalau server tidak merespons sama sekali dalam 6 detik (koneksi lagi
+  // buruk), jangan biarkan tombolnya "mati" menunggu selamanya — anggap boleh lanjut.
+  const timeout = new Promise(function(resolve){
+    setTimeout(function(){ console.warn('Cek kunci Mode Admin timeout, lanjut tanpa menunggu.'); resolve({ok:true}); }, 6000);
+  });
+  return Promise.race([attempt, timeout]);
 }
 function startAdminHeartbeat(){
   if (adminHeartbeatTimer || !FIREBASE_ENABLED || !fbDb) return;
