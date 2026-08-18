@@ -891,6 +891,7 @@ const state = {
   showMatchResult: null,
   showKlasemenPoster: null,
   showTopScorerPoster: false,
+  showGoalkeeperPoster: false,
   selectedTeamId: null,
   liveRunning: true,
   theme: 'dark',
@@ -947,6 +948,7 @@ function buildApp(){
   if (state.showMatchResult) app.appendChild(buildMatchResultModal(t));
   if (state.showKlasemenPoster) app.appendChild(buildKlasemenPosterModal(t));
   if (state.showTopScorerPoster) app.appendChild(buildTopScorerPosterModal(t));
+  if (state.showGoalkeeperPoster) app.appendChild(buildGoalkeeperPosterModal(t));
   if (state.showAdminLogin) app.appendChild(buildAdminLoginModal());
 
   return app;
@@ -1658,7 +1660,7 @@ let pendingBackgroundRender = false;
 let pendingBackgroundRenderSince = 0;
 let pendingSnapshotData = null; // data dari server yang nunggu giliran aman buat diterapkan
 function isModalOpen(){
-  return !!(state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showAddFixtureEvent || state.showBracketWinner || state.showAdminLogin || state.showEditPlayer || state.showMatchResult || state.showKlasemenPoster || state.showTopScorerPoster);
+  return !!(state.showAddTournament || state.showImportTeams || state.showAddEvent || state.showAddFixtureEvent || state.showBracketWinner || state.showAdminLogin || state.showEditPlayer || state.showMatchResult || state.showKlasemenPoster || state.showTopScorerPoster || state.showGoalkeeperPoster);
 }
 function shouldSkipAutoRender(){
   // Modal terbuka -> jangan render ulang di belakang layar (biar isian di form tidak hilang).
@@ -3032,8 +3034,9 @@ async function drawKlasemenPoster(t, canvas, groupLabel, teams, heroImageUrl){
   }
 }
 
-/* ---------- TOP SCORER POSTER (foto pemain unggulan + daftar peringkat pencetak gol) ---------- */
-async function drawTopScorerPoster(t, canvas, scorers, featuredPhotoUrl){
+/* ---------- POSTER PERINGKAT PEMAIN (dipakai buat Top Scorer & Best Goalkeeper) ---------- */
+async function drawPlayerRankingPoster(t, canvas, players, featuredPhotoUrl, opts){
+  const titleWord1 = opts.titleWord1, titleWord2 = opts.titleWord2, listLabel = opts.listLabel, statKey = opts.statKey, statLabel = opts.statLabel;
   const W = 1080;
   const headerH = 130;
   const titleH = 230;
@@ -3041,7 +3044,7 @@ async function drawTopScorerPoster(t, canvas, scorers, featuredPhotoUrl){
   const rowH = 92, rowGap = 14;
   const hasSponsor = !!t.sponsorLogoUrl;
   const footerH = hasSponsor ? 190 : 90;
-  const H = listTop + scorers.length*(rowH+rowGap) + 40 + footerH;
+  const H = listTop + players.length*(rowH+rowGap) + 40 + footerH;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   await ensurePosterFontsReady();
@@ -3092,33 +3095,33 @@ async function drawTopScorerPoster(t, canvas, scorers, featuredPhotoUrl){
     if (nameLine2) ctx.fillText(truncateText(ctx, nameLine2, W-80), 34, 75);
   }
 
-  // Judul besar "Top SCORER"
+  // Judul besar (mis. "Top SCORER" / "Best GOALKEEPER")
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
   ctx.font = 'italic 700 64px Rajdhani, sans-serif'; ctx.fillStyle = '#4ade80';
-  ctx.fillText('Top', 36, headerH+70);
-  ctx.font = '700 108px Rajdhani, sans-serif';
+  ctx.fillText(titleWord1, 36, headerH+70);
+  ctx.font = '700 '+(titleWord2.length>8?84:108)+'px Rajdhani, sans-serif';
   ctx.lineWidth = 2.5; ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ffffff';
-  ctx.fillText('SCORER', 34, headerH+165);
+  ctx.fillText(titleWord2, 34, headerH+165);
   ctx.font = '600 26px Rajdhani, sans-serif'; ctx.fillStyle = '#f5c518';
   ctx.fillText(truncateText(ctx, t.name.toUpperCase(), W-360), 36, headerH+200);
 
-  // Header kecil daftar "TOP SCORER" + ikon bola
+  // Header kecil daftar + ikon
   const listX = 36, listW = W-72;
   const headBarH = 46;
   drawRoundedRect(ctx, listX, listTop, Math.min(280, listW), headBarH, 8);
   ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth=1.5; ctx.stroke();
   ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='700 20px Rajdhani, sans-serif'; ctx.fillStyle='#ffffff';
-  ctx.fillText('TOP SCORER', listX+18, listTop+headBarH/2+1);
+  ctx.fillText(listLabel, listX+18, listTop+headBarH/2+1);
 
-  const crestImgs = await Promise.all(scorers.map(function(p){
+  const crestImgs = await Promise.all(players.map(function(p){
     const team = t.teams.find(function(x){return x.name===p.team;});
     return loadImgAsync(team ? team.logoUrl : null);
   }));
 
   let y = listTop + headBarH + 22;
-  const rowW = W*0.56; // semua baris (termasuk peringkat 1) pakai lebar yang sama, biar ga nabrak area foto
-  scorers.forEach(function(p, i){
+  const rowW = W*0.56; // semua baris pakai lebar yang mirip, biar ga nabrak area foto
+  players.forEach(function(p, i){
     const isTop = i===0;
     const thisRowW = isTop ? rowW + 60 : rowW;
     const rcy = y + rowH/2;
@@ -3148,14 +3151,14 @@ async function drawTopScorerPoster(t, canvas, scorers, featuredPhotoUrl){
     ctx.fillStyle = isTop ? 'rgba(28,18,7,.75)' : 'rgba(255,255,255,.55)';
     ctx.fillText(truncateText(ctx, (p.team||'').toUpperCase(), nameMaxW), nameX, rcy+14);
 
-    // Angka gol dibikin besar dan penuh mengisi kotaknya, mirip referensi.
+    // Angka statistik dibikin besar dan penuh mengisi kotaknya, mirip referensi.
     drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 10);
     ctx.fillStyle = '#12224a'; ctx.fill();
     ctx.textAlign='center';
     ctx.font = (isTop?'800 44px':'800 34px')+' Rajdhani, sans-serif'; ctx.fillStyle='#ffffff';
-    ctx.fillText(String(p.goals||0), pillX+pillW/2, pillY+pillH/2-9);
+    ctx.fillText(String(p[statKey]||0), pillX+pillW/2, pillY+pillH/2-9);
     ctx.font = (isTop?'700 14px':'700 12px')+' Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.7)';
-    ctx.fillText('GOALS', pillX+pillW/2, pillY+pillH/2+18);
+    ctx.fillText(statLabel, pillX+pillW/2, pillY+pillH/2+18);
 
     y += rowH+rowGap;
   });
@@ -3168,6 +3171,16 @@ async function drawTopScorerPoster(t, canvas, scorers, featuredPhotoUrl){
     ctx.textBaseline='alphabetic';
     ctx.fillText(t.name, W/2, H-40);
   }
+}
+function drawTopScorerPoster(t, canvas, scorers, featuredPhotoUrl){
+  return drawPlayerRankingPoster(t, canvas, scorers, featuredPhotoUrl, {
+    titleWord1:'Top', titleWord2:'SCORER', listLabel:'TOP SCORER', statKey:'goals', statLabel:'GOALS'
+  });
+}
+function drawGoalkeeperPoster(t, canvas, gks, featuredPhotoUrl){
+  return drawPlayerRankingPoster(t, canvas, gks, featuredPhotoUrl, {
+    titleWord1:'Best', titleWord2:'GOALKEEPER', listLabel:'BEST GOALKEEPER', statKey:'cleanSheets', statLabel:'CLEAN SHEETS'
+  });
 }
 
 function buildTopScorerPosterModal(t){
@@ -3230,6 +3243,76 @@ function buildTopScorerPosterModal(t){
     if (!currentCanvas) return;
     const a = document.createElement('a');
     a.download = 'top-scorer.png';
+    a.href = currentCanvas.toDataURL('image/png');
+    a.click();
+  });
+  genPreview();
+
+  box.appendChild(body);
+  overlay.appendChild(box);
+  return overlay;
+}
+
+function buildGoalkeeperPosterModal(t){
+  const overlay = h('div', {class:'modal-overlay', onclick:function(e){ if(e.target===overlay){ state.showGoalkeeperPoster=false; render(); } }});
+  const box = h('div', {class:'modal-box', style:{maxWidth:'560px'}});
+  box.appendChild(h('div', {class:'modal-head'}, [h('h3',{},'Buat Gambar Best Goalkeeper'), h('button',{class:'modal-close', onclick:function(){ state.showGoalkeeperPoster=false; render(); }}, icon('x',20))]));
+
+  const body = h('div', {class:'flex-col gap-4'});
+  const sortedGKs = t.bestGK.slice().sort(function(a,b){ return (Number(b.cleanSheets)||0)-(Number(a.cleanSheets)||0); }).slice(0,5);
+  const topId = sortedGKs.length ? sortedGKs[0].id : null;
+
+  if (state.adminMode && topId){
+    const photoWrap = h('div', {});
+    photoWrap.appendChild(h('label', {class:'form-label'}, 'Foto Kiper Unggulan (Best GK #1: ' + sortedGKs[0].name + ')'));
+    const photoRow = h('div', {class:'flex items-center gap-3'});
+    const photoPreview = sortedGKs[0].photoUrl
+      ? h('img', {src:sortedGKs[0].photoUrl, style:{height:'64px', width:'64px', objectFit:'cover', borderRadius:'10px'}})
+      : h('div', {class:'text-xs muted', style:{height:'64px', width:'64px', display:'flex', alignItems:'center', justifyContent:'center', border:'1px dashed var(--border)', borderRadius:'10px'}}, 'Belum ada');
+    photoRow.appendChild(photoPreview);
+    const photoUploadBtn = h('button', {class:'btn btn-ghost-blue', type:'button', style:{fontSize:'12px'}, onclick:function(e){
+      e.preventDefault(); e.stopPropagation();
+      pickImageFile(function(file){
+        compressImageFile(file, function(dataUrl, errMsg){
+          if (!dataUrl){ alert(errMsg || 'Gagal memuat foto.'); return; }
+          const liveGK = T().bestGK.find(function(x){return x.id===topId;});
+          if (liveGK) liveGK.photoUrl = dataUrl;
+          render(); genPreview();
+        }, BANNER_MAX_PX, BANNER_QUALITY);
+      });
+    }}, [icon('camera',12), sortedGKs[0].photoUrl ? 'Ganti Foto' : 'Upload Foto']);
+    photoRow.appendChild(photoUploadBtn);
+    photoWrap.appendChild(photoRow);
+    body.appendChild(photoWrap);
+  }
+
+  const previewWrap = h('div', {style:{textAlign:'center', background:'var(--surface-2)', borderRadius:'10px', padding:'10px', minHeight:'120px', display:'flex', alignItems:'center', justifyContent:'center'}});
+  const statusMsg = h('p', {class:'text-xs muted', style:{margin:'0', textAlign:'center'}}, 'Memuat pratinjau…');
+  body.appendChild(previewWrap);
+  body.appendChild(statusMsg);
+  const downloadBtn = h('button', {class:'btn btn-primary w-full', style:{padding:'12px'}, disabled:true}, [icon('download',16), 'Download Gambar (PNG)']);
+  body.appendChild(downloadBtn);
+
+  let currentCanvas = null;
+  function genPreview(){
+    const liveGKs = T().bestGK.slice().sort(function(a,b){ return (Number(b.cleanSheets)||0)-(Number(a.cleanSheets)||0); }).slice(0,5);
+    if (liveGKs.length===0){
+      previewWrap.innerHTML=''; statusMsg.textContent='Belum ada data Best Goalkeeper.'; downloadBtn.disabled=true; return;
+    }
+    statusMsg.textContent = 'Memuat pratinjau…';
+    const canvas = document.createElement('canvas');
+    drawGoalkeeperPoster(T(), canvas, liveGKs, liveGKs[0].photoUrl||null).then(function(){
+      currentCanvas = canvas;
+      previewWrap.innerHTML = '';
+      previewWrap.appendChild(h('img', {src:canvas.toDataURL('image/png'), style:{maxWidth:'100%', borderRadius:'8px', display:'block', margin:'0 auto'}}));
+      statusMsg.textContent = liveGKs.length + ' pemain • siap didownload';
+      downloadBtn.disabled = false;
+    }).catch(function(err){ console.error('Gagal membuat poster goalkeeper:', err); statusMsg.textContent='Gagal membuat pratinjau.'; });
+  }
+  downloadBtn.addEventListener('click', function(){
+    if (!currentCanvas) return;
+    const a = document.createElement('a');
+    a.download = 'best-goalkeeper.png';
     a.href = currentCanvas.toDataURL('image/png');
     a.click();
   });
@@ -3721,8 +3804,11 @@ function buildPlayerStatsPanel(t){
     liveT.bestGK = merged;
     render();
   }}, icon('trash',13)) : null;
+  const posterGkBtn = h('button', {class:'icon-btn', title:'Buat gambar Best Goalkeeper', onclick:function(){
+    state.showGoalkeeperPoster = true; render();
+  }}, icon('download',13));
   const colB = h('div');
-  colB.appendChild(h('div', {class:'flex items-center justify-between mb-3'}, [h('p',{class:'text-xs muted uppercase'},'Best Goalkeepers'), h('div',{class:'flex gap-1'},[recalcGkBtn, dedupGkBtn, addGkBtn])]));
+  colB.appendChild(h('div', {class:'flex items-center justify-between mb-3'}, [h('p',{class:'text-xs muted uppercase'},'Best Goalkeepers'), h('div',{class:'flex gap-1'},[posterGkBtn, recalcGkBtn, dedupGkBtn, addGkBtn])]));
   const listB = h('div', {class:'player-list'});
   t.bestGK.slice().sort(function(a,b){ return (Number(b.cleanSheets)||0)-(Number(a.cleanSheets)||0); }).forEach(function(p){
     const pid = p.id;
