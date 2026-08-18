@@ -3074,15 +3074,22 @@ async function drawTopScorerPoster(t, canvas, scorers, featuredPhotoUrl){
   // Header: logo turnamen + ikon pemain + nama turnamen, pojok kiri atas
   const logoImg = await loadImgAsync(t.logoImageUrl);
   const kickImg = await loadImgAsync(t.kickIconUrl);
+  // Pecah nama turnamen jadi 2 baris: kata pertama di baris atas, sisanya di bawah
+  // (mis. "ARKA" / "SPORT FESTIVAL") — bukan berdasar lebar teks lagi.
+  const nameParts = t.name.toUpperCase().trim().split(/\s+/);
+  const nameLine1 = nameParts[0] || '';
+  const nameLine2 = nameParts.slice(1).join(' ');
   if (logoImg){
     const cleanedLogo = removeDarkBackground(logoImg, 38);
     const lgh = 60, lgw = lgh*(cleanedLogo.width/cleanedLogo.height||1);
     ctx.drawImage(cleanedLogo, 34, 28, lgw, lgh);
     ctx.textAlign='left'; ctx.font='700 24px Rajdhani, sans-serif'; ctx.fillStyle='#ffffff';
-    wrapText(ctx, t.name.toUpperCase(), 240).slice(0,2).forEach(function(line, li){ ctx.fillText(line, 34+lgw+12, 48+li*27); });
+    ctx.fillText(nameLine1, 34+lgw+12, 48);
+    if (nameLine2) ctx.fillText(truncateText(ctx, nameLine2, W-34-lgw-12-40), 34+lgw+12, 75);
   } else {
     ctx.textAlign='left'; ctx.font='700 24px Rajdhani, sans-serif'; ctx.fillStyle='#ffffff';
-    wrapText(ctx, t.name.toUpperCase(), 300).slice(0,2).forEach(function(line, li){ ctx.fillText(line, 34, 48+li*27); });
+    ctx.fillText(nameLine1, 34, 48);
+    if (nameLine2) ctx.fillText(truncateText(ctx, nameLine2, W-80), 34, 75);
   }
 
   // Judul besar "Top SCORER"
@@ -3110,10 +3117,10 @@ async function drawTopScorerPoster(t, canvas, scorers, featuredPhotoUrl){
   }));
 
   let y = listTop + headBarH + 22;
-  const rowW = W*0.56; // biar ga numpuk ke area foto buat baris ke-2 dst
+  const rowW = W*0.56; // semua baris (termasuk peringkat 1) pakai lebar yang sama, biar ga nabrak area foto
   scorers.forEach(function(p, i){
     const isTop = i===0;
-    const thisRowW = isTop ? listW : rowW;
+    const thisRowW = isTop ? rowW + 60 : rowW;
     const rcy = y + rowH/2;
     drawRoundedRect(ctx, listX, y, thisRowW, rowH, 10);
     if (isTop){
@@ -3128,24 +3135,27 @@ async function drawTopScorerPoster(t, canvas, scorers, featuredPhotoUrl){
     const crestR = isTop ? 30 : 24, crestCx = listX+crestR+14;
     drawCrest(ctx, crestImgs[i], {name:p.team}, crestCx, rcy, crestR);
 
+    const pillW = isTop?128:104, pillH = isTop?76:60;
+    const pillX = listX+thisRowW-pillW-14, pillY = rcy-pillH/2;
+
     ctx.textAlign='left'; ctx.textBaseline='middle';
     const nameX = crestCx+crestR+14;
+    const nameMaxW = pillX-16-nameX;
     ctx.font = (isTop?'700 28px':'700 22px')+' Rajdhani, sans-serif';
     ctx.fillStyle = isTop ? '#1c1207' : '#ffffff';
-    ctx.fillText(truncateText(ctx, (p.name||'').toUpperCase(), thisRowW*0.42), nameX, rcy-9);
+    ctx.fillText(truncateText(ctx, (p.name||'').toUpperCase(), nameMaxW), nameX, rcy-9);
     ctx.font = (isTop?'600 18px':'600 15px')+' Rajdhani, sans-serif';
     ctx.fillStyle = isTop ? 'rgba(28,18,7,.75)' : 'rgba(255,255,255,.55)';
-    ctx.fillText(truncateText(ctx, (p.team||'').toUpperCase(), thisRowW*0.4), nameX, rcy+14);
+    ctx.fillText(truncateText(ctx, (p.team||'').toUpperCase(), nameMaxW), nameX, rcy+14);
 
-    const pillW = isTop?110:90, pillH = isTop?52:42;
-    const pillX = listX+thisRowW-pillW-14, pillY = rcy-pillH/2;
-    drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 8);
+    // Angka gol dibikin besar dan penuh mengisi kotaknya, mirip referensi.
+    drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 10);
     ctx.fillStyle = '#12224a'; ctx.fill();
     ctx.textAlign='center';
-    ctx.font = (isTop?'700 26px':'700 20px')+' Rajdhani, sans-serif'; ctx.fillStyle='#ffffff';
-    ctx.fillText(String(p.goals||0), pillX+pillW/2, pillY+pillH/2-6);
-    ctx.font = '600 12px Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.7)';
-    ctx.fillText('GOALS', pillX+pillW/2, pillY+pillH/2+12);
+    ctx.font = (isTop?'800 44px':'800 34px')+' Rajdhani, sans-serif'; ctx.fillStyle='#ffffff';
+    ctx.fillText(String(p.goals||0), pillX+pillW/2, pillY+pillH/2-9);
+    ctx.font = (isTop?'700 14px':'700 12px')+' Rajdhani, sans-serif'; ctx.fillStyle='rgba(255,255,255,.7)';
+    ctx.fillText('GOALS', pillX+pillW/2, pillY+pillH/2+18);
 
     y += rowH+rowGap;
   });
