@@ -4123,13 +4123,25 @@ function buildFixturesPage(t){
           if (gksA.length>1){
             const selA = h('select', {class:'form-input', style:{width:'auto', padding:'3px 6px', fontSize:'11px'}}, gksA.map(function(p){ return h('option',{value:p.id}, 'Kiper A: '+p.name); }));
             selA.value = s.gkAId || gksA[0].id;
-            selA.addEventListener('change', function(e){ const liveT=T(); const liveS=liveT.schedule.find(function(x){return x.id===s.id;}); if(liveS){ liveS.gkAId=e.target.value; recalculateBestGK(liveT); } render(); });
+            selA.addEventListener('change', function(e){
+              const liveT=T(); const liveS=liveT.schedule.find(function(x){return x.id===s.id;});
+              if (liveS){ liveS.gkAId=e.target.value; recalculateBestGK(liveT); }
+              // Sengaja TIDAK panggil render() penuh di sini — supaya dropdown ini sendiri
+              // (yang baru saja diubah user) tidak ikut dibongkar-pasang ulang oleh render,
+              // yang riskan bikin pilihannya kelihatan balik lagi. Cukup simpan datanya;
+              // panel Best Goalkeepers akan otomatis ke-update pas halaman itu dibuka lagi.
+              scheduleSave();
+            });
             gkRow.appendChild(selA);
           }
           if (gksB.length>1){
             const selB = h('select', {class:'form-input', style:{width:'auto', padding:'3px 6px', fontSize:'11px'}}, gksB.map(function(p){ return h('option',{value:p.id}, 'Kiper B: '+p.name); }));
             selB.value = s.gkBId || gksB[0].id;
-            selB.addEventListener('change', function(e){ const liveT=T(); const liveS=liveT.schedule.find(function(x){return x.id===s.id;}); if(liveS){ liveS.gkBId=e.target.value; recalculateBestGK(liveT); } render(); });
+            selB.addEventListener('change', function(e){
+              const liveT=T(); const liveS=liveT.schedule.find(function(x){return x.id===s.id;});
+              if (liveS){ liveS.gkBId=e.target.value; recalculateBestGK(liveT); }
+              scheduleSave();
+            });
             gkRow.appendChild(selB);
           }
           infoBlock.appendChild(gkRow);
